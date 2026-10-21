@@ -1,0 +1,141 @@
+{
+  "date": "2026-10-21T13:03:05.059Z",
+  "base": "http://localhost:3000",
+  "duration": 10,
+  "machine": {
+    "cpu": "Intel(R) Core(TM) i7-8550U CPU @ 1.80GHz x8",
+    "ramGb": 8,
+    "os": "Windows_NT 10.0.19045",
+    "node": "v22.23.2"
+  },
+  "rows": [
+    {
+      "scenario": "GET event queue",
+      "connections": 10,
+      "reqPerSec": 244,
+      "p50": 39,
+      "p99": 80,
+      "errorRate": 0
+    },
+    {
+      "scenario": "GET event queue",
+      "connections": 50,
+      "reqPerSec": 276,
+      "p50": 173,
+      "p99": 258,
+      "errorRate": 0
+    },
+    {
+      "scenario": "GET event queue",
+      "connections": 100,
+      "reqPerSec": 309,
+      "p50": 303,
+      "p99": 554,
+      "errorRate": 0
+    },
+    {
+      "scenario": "GET event queue",
+      "connections": 200,
+      "reqPerSec": 310,
+      "p50": 615,
+      "p99": 864,
+      "errorRate": 0
+    },
+    {
+      "scenario": "Track Vote: vote",
+      "connections": 10,
+      "reqPerSec": 160,
+      "p50": 52,
+      "p99": 237,
+      "errorRate": 0
+    },
+    {
+      "scenario": "Track Vote: vote",
+      "connections": 50,
+      "reqPerSec": 153,
+      "p50": 255,
+      "p99": 1003,
+      "errorRate": 0
+    },
+    {
+      "scenario": "Track Vote: vote",
+      "connections": 100,
+      "reqPerSec": 156,
+      "p50": 562,
+      "p99": 1323,
+      "errorRate": 0
+    },
+    {
+      "scenario": "Track Vote: vote",
+      "connections": 200,
+      "reqPerSec": 149,
+      "p50": 1217,
+      "p99": 2441,
+      "errorRate": 0
+    },
+    {
+      "scenario": "Playlist Editor: move",
+      "connections": 10,
+      "reqPerSec": 64,
+      "p50": 67,
+      "p99": 750,
+      "errorRate": 0
+    },
+    {
+      "scenario": "Playlist Editor: move",
+      "connections": 50,
+      "reqPerSec": 69,
+      "p50": 653,
+      "p99": 1187,
+      "errorRate": 0
+    },
+    {
+      "scenario": "Playlist Editor: move",
+      "connections": 100,
+      "reqPerSec": 69,
+      "p50": 1211,
+      "p99": 2605,
+      "errorRate": 0
+    },
+    {
+      "scenario": "Playlist Editor: move",
+      "connections": 200,
+      "reqPerSec": 56,
+      "p50": 3055,
+      "p99": 6371,
+      "errorRate": 0
+    },
+    {
+      "scenario": "Control Delegation: command",
+      "connections": 10,
+      "reqPerSec": 111,
+      "p50": 53,
+      "p99": 374,
+      "errorRate": 0
+    },
+    {
+      "scenario": "Control Delegation: command",
+      "connections": 50,
+      "reqPerSec": 141,
+      "p50": 339,
+      "p99": 791,
+      "errorRate": 0
+    },
+    {
+      "scenario": "Control Delegation: command",
+      "connections": 100,
+      "reqPerSec": 145,
+      "p50": 536,
+      "p99": 1451,
+      "errorRate": 0
+    },
+    {
+      "scenario": "Control Delegation: command",
+      "connections": 200,
+      "reqPerSec": 112,
+      "p50": 1589,
+      "p99": 3458,
+      "errorRate": 0
+    }
+  ]
+}

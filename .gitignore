@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+coverage/
+web-build/
+.expo/
+mobile/android/
+mobile/ios/
+
+# secrets: every credential lives in a local, untracked .env file
+.env
+.env.*
+!.env.example
+
+# local database (embedded PostgreSQL for dev without Docker)
+.pgdata/
+
+# logs / OS
+*.log
+.DS_Store
+Thumbs.db

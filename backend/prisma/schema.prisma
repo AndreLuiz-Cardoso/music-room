@@ -1,0 +1,295 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Visibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum EventLicense {
+  EVERYONE
+  INVITED_ONLY
+  LOCATION_TIME
+}
+
+enum PlaylistLicense {
+  EVERYONE
+  INVITED_ONLY
+}
+
+enum EventTrackStatus {
+  QUEUED
+  PLAYING
+  PLAYED
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+}
+
+enum TokenKind {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+}
+
+model User {
+  id               String    @id @default(uuid())
+  email            String    @unique
+  passwordHash     String?
+  emailVerified    Boolean   @default(false)
+  googleId         String?   @unique
+  facebookId       String?   @unique
+  // public information
+  displayName      String
+  avatarUrl        String?
+  bio              String?
+  musicPreferences String[]  @default([])
+  // information only visible to friends
+  friendsInfo      String?
+  // information only visible to the user
+  privateInfo      String?
+  failedLogins     Int       @default(0)
+  lockedUntil      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  refreshTokens        RefreshToken[]
+  oneTimeTokens        OneTimeToken[]
+  friendshipsA         Friendship[]       @relation("FriendshipA")
+  friendshipsB         Friendship[]       @relation("FriendshipB")
+  friendshipsRequested Friendship[]       @relation("FriendshipRequester")
+  ownedEvents          Event[]
+  eventInvites         EventInvite[]
+  suggestedTracks      EventTrack[]
+  votes                Vote[]
+  ownedPlaylists       Playlist[]
+  playlistInvites      PlaylistInvite[]
+  addedTracks          PlaylistTrack[]
+  devices              Device[]
+  delegations          DeviceDelegation[]
+}
+
+// Refresh tokens are stored hashed. A family groups the successive rotations of one
+// login session, so that the reuse of a rotated token revokes the whole session.
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  familyId  String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([familyId])
+  @@index([userId])
+}
+
+model OneTimeToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      TokenKind
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+// One row per pair of users: userAId < userBId, so two crossed requests cannot both exist.
+model Friendship {
+  id          String           @id @default(uuid())
+  userAId     String
+  userBId     String
+  requesterId String
+  status      FriendshipStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  userA       User             @relation("FriendshipA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB       User             @relation("FriendshipB", fields: [userBId], references: [id], onDelete: Cascade)
+  requester   User             @relation("FriendshipRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+
+  @@unique([userAId, userBId])
+  @@index([userBId])
+}
+
+// ---------- Music Track Vote ----------
+
+model Event {
+  id           String       @id @default(uuid())
+  name         String
+  description  String?
+  ownerId      String
+  owner        User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  visibility   Visibility   @default(PUBLIC)
+  license      EventLicense @default(EVERYONE)
+  latitude     Float?
+  longitude    Float?
+  radiusMeters Int?
+  voteStartsAt DateTime?
+  voteEndsAt   DateTime?
+  version      Int          @default(0)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  invites      EventInvite[]
+  tracks       EventTrack[]
+
+  @@index([visibility])
+  @@index([ownerId])
+}
+
+model EventInvite {
+  eventId   String
+  userId    String
+  createdAt DateTime @default(now())
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, userId])
+  @@index([userId])
+}
+
+model EventTrack {
+  id            String           @id @default(uuid())
+  eventId       String
+  event         Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  trackId       String
+  title         String
+  artist        String
+  album         String?
+  coverUrl      String?
+  previewUrl    String?
+  durationSec   Int
+  score         Int              @default(0)
+  status        EventTrackStatus @default(QUEUED)
+  suggestedById String
+  suggestedBy   User             @relation(fields: [suggestedById], references: [id], onDelete: Cascade)
+  createdAt     DateTime         @default(now())
+  playedAt      DateTime?
+  votes         Vote[]
+
+  @@index([eventId, status, score])
+}
+
+// The composite primary key makes a vote idempotent: one user, one vote per track.
+model Vote {
+  eventTrackId String
+  userId       String
+  createdAt    DateTime   @default(now())
+  eventTrack   EventTrack @relation(fields: [eventTrackId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([eventTrackId, userId])
+  @@index([userId])
+}
+
+// ---------- Music Playlist Editor ----------
+
+model Playlist {
+  id          String          @id @default(uuid())
+  name        String
+  description String?
+  ownerId     String
+  owner       User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  visibility  Visibility      @default(PUBLIC)
+  license     PlaylistLicense @default(EVERYONE)
+  version     Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  invites     PlaylistInvite[]
+  tracks      PlaylistTrack[]
+
+  @@index([visibility])
+  @@index([ownerId])
+}
+
+model PlaylistInvite {
+  playlistId String
+  userId     String
+  createdAt  DateTime @default(now())
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([playlistId, userId])
+  @@index([userId])
+}
+
+model PlaylistTrack {
+  id          String   @id @default(uuid())
+  playlistId  String
+  playlist    Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  position    Int
+  trackId     String
+  title       String
+  artist      String
+  album       String?
+  coverUrl    String?
+  previewUrl  String?
+  durationSec Int
+  addedById   String
+  addedBy     User     @relation(fields: [addedById], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([playlistId, trackId])
+  @@index([playlistId, position])
+}
+
+// ---------- Music Control Delegation ----------
+
+model Device {
+  id             String             @id @default(uuid())
+  ownerId        String
+  owner          User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  installationId String
+  name           String
+  platform       String?
+  model          String?
+  appVersion     String?
+  playback       Json
+  version        Int                @default(0)
+  lastSeenAt     DateTime           @default(now())
+  createdAt      DateTime           @default(now())
+  delegations    DeviceDelegation[]
+
+  @@unique([ownerId, installationId])
+}
+
+// The per-device "license": which friend may control which device, optionally until a date.
+model DeviceDelegation {
+  id         String    @id @default(uuid())
+  deviceId   String
+  delegateId String
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+  device     Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  delegate   User      @relation(fields: [delegateId], references: [id], onDelete: Cascade)
+
+  @@unique([deviceId, delegateId])
+  @@index([delegateId])
+}
+
+// ---------- Logs ----------
+
+// One row per action performed from a client. No foreign key: logging must never block or fail a request.
+model ActionLog {
+  id         BigInt   @id @default(autoincrement())
+  userId     String?
+  method     String
+  route      String
+  statusCode Int
+  platform   String?
+  device     String?
+  appVersion String?
+  ip         String?
+  durationMs Int
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
