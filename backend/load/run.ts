@@ -1,18 +1,9 @@
-// Ramp-up measurement of the three services.
-//
-// Start the API with the offline catalog and a high rate limit (the limit is per IP and
-// the benchmark comes from a single IP):
-//   TRACK_CATALOG=fake RATE_LIMIT_MAX=100000000 npm start
-// then, in another terminal:
-//   npm run load                      (defaults: 20s per step, steps of 10/50/100/200 connections)
-//   LOAD_URL=http://host:3000 LOAD_DURATION=30 LOAD_STEPS=50,100,400 npm run load
-//
-// Users, an event, a playlist and a device are seeded directly in the database; each
-// request picks a random user so that the votes are spread like in real life.
+// Load ramp-up: start the API with TRACK_CATALOG=fake and a high RATE_LIMIT_MAX (docs/RAMPUP.md).
 import os from 'node:os';
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import autocannon from 'autocannon';
+import { io, type Socket } from 'socket.io-client';
 import { prisma } from '../src/db';
 import { signAccessToken } from '../src/auth/tokens';
 import { initialPlayback } from '../src/domain/playback';
@@ -21,10 +12,13 @@ import { pairKey } from '../src/services/users';
 const BASE = process.env.LOAD_URL ?? 'http://localhost:3000';
 const DURATION = Number(process.env.LOAD_DURATION ?? 20);
 const STEPS = (process.env.LOAD_STEPS ?? '10,50,100,200').split(',').map(Number);
+/** Real-time steps: phones connected by WebSocket to the voted event. */
+const PHONES = (process.env.LOAD_PHONES ?? '100,500,1000').split(',').map(Number);
 const USERS = 500;
 const TRACKS = 50;
 
 interface Seed {
+  run: string;
   tokens: string[];
   eventId: string;
   entryIds: string[];
@@ -73,6 +67,7 @@ async function seed(): Promise<Seed> {
   await prisma.deviceDelegation.createMany({ data: delegates.map((u) => ({ deviceId: device.id, delegateId: u.id })) });
 
   return {
+    run,
     tokens: users.map((u) => signAccessToken(u.id)),
     eventId: event.id,
     entryIds: entries.map((e) => e.id),
@@ -152,6 +147,63 @@ async function measure(sc: Scenario, connections: number) {
   };
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Real-time delay: from a probe's vote to each phone receiving that queue version (or later). */
+async function measureRealtime(s: Seed, phones: number) {
+  const received: { version: number; at: number }[][] = Array.from({ length: phones }, () => []);
+  const sockets = await Promise.all(
+    Array.from(
+      { length: phones },
+      (_, i) =>
+        new Promise<Socket>((resolve, reject) => {
+          const socket = io(BASE, { auth: { token: s.tokens[i % s.tokens.length] }, transports: ['websocket'], reconnection: false });
+          socket.on('event:state', (state: { version: number }) => received[i].push({ version: state.version, at: performance.now() }));
+          socket.on('connect_error', reject);
+          socket.on('connect', () => socket.emit('subscribe', `event:${s.eventId}`, () => resolve(socket)));
+        }),
+    ),
+  );
+
+  const probes: { version: number; at: number }[] = [];
+  const probeToken = s.tokens[s.tokens.length - 1];
+  let vote = true;
+  const probing = setInterval(async () => {
+    const sent = performance.now();
+    const res = await fetch(`${BASE}/events/${s.eventId}/tracks/${s.entryIds[0]}/vote`, {
+      method: vote ? 'POST' : 'DELETE',
+      headers: { authorization: `Bearer ${probeToken}`, ...(vote ? { 'content-type': 'application/json' } : {}) },
+      body: vote ? '{}' : undefined,
+    }).catch(() => null);
+    vote = !vote;
+    if (res?.ok) probes.push({ version: ((await res.json()) as { version: number }).version, at: sent });
+  }, 500);
+  const votes = await measure(scenarios(s)[1], 50);
+  clearInterval(probing);
+  await sleep(3000); // the last pushes
+
+  const delays: number[] = [];
+  let missed = 0;
+  for (const probe of probes) {
+    for (const pushes of received) {
+      const push = pushes.find((p) => p.version >= probe.version);
+      if (push) delays.push(push.at - probe.at);
+      else missed++;
+    }
+  }
+  sockets.forEach((socket) => socket.close());
+  delays.sort((a, b) => a - b);
+  const at = (q: number) => Math.round(delays[Math.min(delays.length - 1, Math.floor(q * delays.length))] ?? 0);
+  return {
+    scenario: 'Real time: phones following a voted event',
+    connections: phones,
+    reqPerSec: votes.reqPerSec,
+    p50: at(0.5),
+    p99: at(0.99),
+    errorRate: +((missed / Math.max(1, probes.length * phones)) * 100).toFixed(2),
+  };
+}
+
 async function main() {
   const machine = {
     cpu: `${os.cpus()[0]?.model.trim()} x${os.cpus().length}`,
@@ -162,14 +214,26 @@ async function main() {
   console.log('Machine:', machine);
   const s = await seed();
   const rows = [];
-  for (const sc of scenarios(s)) {
-    for (const c of STEPS) {
-      const row = await measure(sc, c);
+  try {
+    for (const sc of scenarios(s)) {
+      for (const c of STEPS) {
+        const row = await measure(sc, c);
+        rows.push(row);
+        console.log(
+          `${row.scenario.padEnd(30)} ${String(c).padStart(4)} conn  ${String(row.reqPerSec).padStart(6)} req/s  p50 ${row.p50}ms  p99 ${row.p99}ms  errors ${row.errorRate}%`,
+        );
+      }
+    }
+    for (const phones of PHONES) {
+      const row = await measureRealtime(s, phones);
       rows.push(row);
       console.log(
-        `${row.scenario.padEnd(30)} ${String(c).padStart(4)} conn  ${String(row.reqPerSec).padStart(6)} req/s  p50 ${row.p50}ms  p99 ${row.p99}ms  errors ${row.errorRate}%`,
+        `Real time: ${String(phones).padStart(5)} phones follow the event, ${row.reqPerSec} votes/s  delay p50 ${row.p50}ms  p99 ${row.p99}ms  missed ${row.errorRate}%`,
       );
     }
+  } finally {
+    // the seeded users take their event, playlist, device and delegations with them (cascade)
+    await prisma.user.deleteMany({ where: { email: { startsWith: `load-${s.run}-` } } });
   }
   const out = path.resolve(__dirname, 'results.json');
   writeFileSync(out, JSON.stringify({ date: new Date().toISOString(), base: BASE, duration: DURATION, machine, rows }, null, 2));

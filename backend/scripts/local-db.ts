@@ -1,12 +1,11 @@
-// Development helper: runs a real PostgreSQL server (embedded binaries downloaded by npm)
-// so the project can be run without Docker. Settings come from DATABASE_URL.
-//   npm run db:local          -> starts the server and keeps it running (Ctrl+C to stop)
+// Embedded PostgreSQL (npm run db:local, keeps running), configured from DATABASE_URL.
 import 'dotenv/config';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 
 async function main() {
-  const url = new URL(process.env.DATABASE_URL ?? 'postgresql://musicroom:musicroom@localhost:5433/musicroom');
+  if (!process.env.DATABASE_URL) throw new Error('Set DATABASE_URL in backend/.env first (see .env.example)');
+  const url = new URL(process.env.DATABASE_URL);
   const database = url.pathname.slice(1);
   const dir = path.resolve(__dirname, '..', '..', '.pgdata');
   const { default: EmbeddedPostgres } = await import('embedded-postgres');
