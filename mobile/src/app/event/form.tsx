@@ -1,13 +1,14 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { eventLicenseOptions, visibilityOptions } from '@/components/shared';
 import { Body, Button, Choice, ErrorText, Input, Screen } from '@/components/ui';
 import { api, errorMessage, type EventInput } from '@/lib/api';
-import { confirm } from '@/lib/hooks';
+import { confirmDelete } from '@/lib/hooks';
 import { currentPosition } from '@/lib/location';
 import type { EventLicense, Visibility } from '@/lib/types';
 
-const pad = (n: number) => String(n).padStart(2, '0');
-const toLocal = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+// "YYYY-MM-DD HH:mm" in local time: shift by the zone offset, then read the UTC ISO string
+const toLocal = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16).replace('T', ' ');
 const fromLocal = (s: string) => {
   const m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/.exec(s.trim());
   return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) : null;
@@ -35,7 +36,8 @@ export default function EventForm() {
       setDescription(e.description ?? '');
       setVisibility(e.visibility);
       setLicense(e.license);
-      if (e.location) {
+      // the form is the owner's, who gets the coordinates
+      if (e.location?.latitude !== undefined && e.location.longitude !== undefined) {
         setLat(String(e.location.latitude));
         setLng(String(e.location.longitude));
         setRadius(String(e.location.radiusMeters));
@@ -77,13 +79,7 @@ export default function EventForm() {
   }
 
   async function remove() {
-    if (!id || !(await confirm('Delete this event?', 'This cannot be undone.'))) return;
-    try {
-      await api.events.remove(id);
-      router.dismissAll();
-    } catch (err) {
-      setError(errorMessage(err));
-    }
+    if (id) setError(await confirmDelete('event', () => api.events.remove(id)));
   }
 
   return (
@@ -94,20 +90,13 @@ export default function EventForm() {
         label="Who can find the event"
         value={visibility}
         onChange={setVisibility}
-        options={[
-          { value: 'PUBLIC', label: 'Everyone (public)' },
-          { value: 'PRIVATE', label: 'Invited only (private)' },
-        ]}
+        options={visibilityOptions}
       />
       <Choice
-        label="Who can vote (license)"
+        label="Who can vote"
         value={license}
         onChange={setLicense}
-        options={[
-          { value: 'EVERYONE', label: 'Everyone' },
-          { value: 'INVITED_ONLY', label: 'Invited only' },
-          { value: 'LOCATION_TIME', label: 'On site, on time' },
-        ]}
+        options={eventLicenseOptions}
       />
       {license === 'LOCATION_TIME' ? (
         <>

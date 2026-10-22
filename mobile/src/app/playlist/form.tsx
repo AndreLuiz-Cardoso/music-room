@@ -1,8 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { playlistLicenseOptions, visibilityOptions } from '@/components/shared';
 import { Button, Choice, ErrorText, Input, Screen } from '@/components/ui';
 import { api, errorMessage } from '@/lib/api';
-import { confirm } from '@/lib/hooks';
+import { confirmDelete } from '@/lib/hooks';
 import type { PlaylistLicense, Visibility } from '@/lib/types';
 
 /** Creates a playlist, or edits it when an id is given. */
@@ -36,13 +37,7 @@ export default function PlaylistForm() {
   }
 
   async function remove() {
-    if (!id || !(await confirm('Delete this playlist?', 'This cannot be undone.'))) return;
-    try {
-      await api.playlists.remove(id);
-      router.dismissAll();
-    } catch (err) {
-      setError(errorMessage(err));
-    }
+    if (id) setError(await confirmDelete('playlist', () => api.playlists.remove(id)));
   }
 
   return (
@@ -53,19 +48,13 @@ export default function PlaylistForm() {
         label="Who can access it"
         value={visibility}
         onChange={setVisibility}
-        options={[
-          { value: 'PUBLIC', label: 'Everyone (public)' },
-          { value: 'PRIVATE', label: 'Invited only (private)' },
-        ]}
+        options={visibilityOptions}
       />
       <Choice
-        label="Who can edit it (license)"
+        label="Who can edit it"
         value={license}
         onChange={setLicense}
-        options={[
-          { value: 'EVERYONE', label: 'Everyone' },
-          { value: 'INVITED_ONLY', label: 'Invited only' },
-        ]}
+        options={playlistLicenseOptions}
       />
       <ErrorText>{error}</ErrorText>
       <Button title={id ? 'Save' : 'Create'} onPress={save} disabled={!name.trim()} />

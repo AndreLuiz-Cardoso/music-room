@@ -1,13 +1,24 @@
+import { Poppins_400Regular, Poppins_500Medium, Poppins_600SemiBold, Poppins_700Bold } from '@expo-google-fonts/poppins';
+import { Righteous_400Regular } from '@expo-google-fonts/righteous';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Loading, colors } from '@/components/ui';
+import { Loading, colors, stackOptions } from '@/components/ui';
 import { AuthProvider, useAuth } from '@/lib/auth';
 
 function RootStack() {
   const { ready, user } = useAuth();
-  if (!ready) {
+  // the keys are the family names in `fonts`; on a load error the app falls back to system fonts
+  const [fontsLoaded, fontError] = useFonts({
+    Righteous_400Regular,
+    Poppins_400Regular,
+    Poppins_500Medium,
+    Poppins_600SemiBold,
+    Poppins_700Bold,
+  });
+  if (!ready || !(fontsLoaded || fontError)) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: 'center' }}>
         <Loading />
@@ -15,13 +26,7 @@ function RootStack() {
     );
   }
   return (
-    <Stack
-      screenOptions={{
-        headerStyle: { backgroundColor: colors.bg },
-        headerTintColor: colors.text,
-        contentStyle: { backgroundColor: colors.bg },
-      }}
-    >
+    <Stack screenOptions={stackOptions}>
       <Stack.Protected guard={!user}>
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       </Stack.Protected>
@@ -34,7 +39,10 @@ function RootStack() {
         <Stack.Screen name="device/[id]" options={{ title: 'Remote control' }} />
         <Stack.Screen name="user/[id]" options={{ title: 'Profile' }} />
       </Stack.Protected>
-      <Stack.Screen name="server" options={{ title: 'Server address' }} />
+      {/* a test tool, opened by its address (/server): it does not exist in release builds */}
+      <Stack.Protected guard={__DEV__}>
+        <Stack.Screen name="server" options={{ title: 'Server address' }} />
+      </Stack.Protected>
     </Stack>
   );
 }

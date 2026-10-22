@@ -1,9 +1,6 @@
 import { Platform } from 'react-native';
 
-// Native social sign-in. The SDKs return a provider credential that the back-end verifies
-// itself with Google / Facebook. These modules contain native code: they are only present in
-// a development or release build (npx expo run:android), not in Expo Go nor on the web, so
-// they are loaded lazily and the buttons are hidden when unavailable.
+// Native sign-in SDKs (absent in Expo Go and on the web); the back-end verifies the credential.
 
 const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 const facebookAppId = process.env.EXPO_PUBLIC_FACEBOOK_APP_ID;
@@ -43,7 +40,6 @@ export async function googleIdToken(): Promise<string> {
   return idToken;
 }
 
-/** Returns a Facebook user access token. */
 export async function facebookAccessToken(): Promise<string> {
   if (!facebook) throw new Error('Facebook login is not available in this build');
   const { LoginManager, AccessToken } = facebook;

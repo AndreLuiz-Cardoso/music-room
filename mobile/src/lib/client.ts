@@ -5,11 +5,13 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { preferences } from './storage';
 
-// Identity of this installation, sent with every request so that the back-end logs the
-// platform, the device and the application version of each action.
+// Installation identity, sent with every request so the back-end logs platform, device and version.
 
+// 10.0.2.2 is the computer from the Android emulator; elsewhere (web, iOS) it is localhost.
+const EMULATOR_HOST = '//10.0.2.2:';
+const CONFIGURED_API_URL = process.env.EXPO_PUBLIC_API_URL ?? `http:${EMULATOR_HOST}3000`;
 const DEFAULT_API_URL =
-  process.env.EXPO_PUBLIC_API_URL ?? (Platform.OS === 'android' ? 'http://10.0.2.2:3000' : 'http://localhost:3000');
+  Platform.OS === 'android' ? CONFIGURED_API_URL : CONFIGURED_API_URL.replace(EMULATOR_HOST, '//localhost:');
 
 let apiUrl = DEFAULT_API_URL;
 
@@ -19,6 +21,10 @@ export async function loadApiUrl(): Promise<string> {
   apiUrl = (await preferences.get('apiUrl')) ?? DEFAULT_API_URL;
   return apiUrl;
 }
+
+/** The API gives previews as one of its own paths (a stable address redirecting to a fresh link). */
+export const mediaUrl = (path: string | null | undefined): string | null =>
+  path?.startsWith('/') ? `${apiUrl}${path}` : (path ?? null);
 
 /** The back-end address is configurable from the app, for tests. */
 export async function setApiUrl(url: string): Promise<void> {

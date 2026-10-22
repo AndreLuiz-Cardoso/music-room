@@ -1,26 +1,16 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { FlatList, Modal, Pressable, Text, View } from 'react-native';
 import { api, errorMessage } from '@/lib/api';
+import { useDebounced } from '@/lib/hooks';
 import type { Track, UserSummary } from '@/lib/types';
-import { Body, Button, Empty, ErrorText, Input, Loading, TrackLine, colors, styles } from './ui';
-
-function useDebounced<T>(value: T, ms = 350): T {
-  const [v, setV] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setV(value), ms);
-    return () => clearTimeout(t);
-  }, [value, ms]);
-  return v;
-}
+import { Body, Button, Empty, ErrorText, Input, Loading, Title, TrackLine, colors, space, styles } from './ui';
 
 function Sheet({ visible, title, onClose, children }: { visible: boolean; title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={[styles.screen, styles.pad, { paddingTop: 48 }]}>
-        <View style={styles.rowBetween}>
-          <Text style={styles.title}>{title}</Text>
-          <Button small variant="secondary" title="Close" onPress={onClose} />
-        </View>
+      <View style={[styles.screen, styles.pad, { paddingTop: space.xxl }]}>
+        <Title right={<Button small variant="secondary" title="Close" onPress={onClose} />}>{title}</Title>
         {children}
       </View>
     </Modal>
@@ -70,7 +60,7 @@ export function TrackPicker({ visible, onClose, onPick }: { visible: boolean; on
         ListEmptyComponent={q && !loading ? <Empty text="No result" /> : undefined}
         renderItem={({ item }) => (
           <Pressable onPress={() => onPick(item)}>
-            <TrackLine title={item.title} artist={item.artist} coverUrl={item.coverUrl} right={<Text style={{ color: colors.accent, fontSize: 22 }}>+</Text>} />
+            <TrackLine title={item.title} artist={item.artist} coverUrl={item.coverUrl} right={<Ionicons name="add-circle-outline" size={20} color={colors.text} />} />
           </Pressable>
         )}
       />
@@ -123,7 +113,7 @@ export function UserPicker({
         renderItem={({ item }) => (
           <Pressable onPress={() => onPick(item)} style={[styles.card, styles.rowBetween]}>
             <Body>{item.displayName}</Body>
-            <Text style={{ color: colors.accent }}>Select</Text>
+            <Text style={styles.link}>Select</Text>
           </Pressable>
         )}
       />

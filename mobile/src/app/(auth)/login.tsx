@@ -1,10 +1,9 @@
-import { Link, router } from 'expo-router';
+import { Link } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { Body, Button, ErrorText, Input, Screen, Title, colors } from '@/components/ui';
+import { Body, Button, ErrorText, Input, Screen, Title, space, styles } from '@/components/ui';
 import { ApiError, api, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { getApiUrl } from '@/lib/client';
 import { notify } from '@/lib/hooks';
 import { SocialCancelled, facebookAccessToken, googleIdToken, socialAvailability } from '@/lib/social';
 
@@ -42,8 +41,8 @@ export default function LoginScreen() {
 
   return (
     <Screen>
-      <View style={{ marginTop: 48, marginBottom: 24 }}>
-        <Text style={{ color: colors.accent, fontSize: 34, fontWeight: '800' }}>Music Room</Text>
+      <View style={{ marginTop: space.xxl, marginBottom: space.xl }}>
+        <Text style={styles.display}>Music Room</Text>
         <Body muted>Vote, edit playlists and pass the aux, together.</Body>
       </View>
       <Title>Log in</Title>
@@ -54,21 +53,13 @@ export default function LoginScreen() {
       <Button title="Log in" onPress={login} loading={busy} disabled={!email || !password} />
       {socialAvailability.google ? <Button title="Continue with Google" variant="secondary" onPress={google} /> : null}
       {socialAvailability.facebook ? <Button title="Continue with Facebook" variant="secondary" onPress={facebook} /> : null}
-      {!socialAvailability.google && !socialAvailability.facebook ? (
-        <Body muted style={{ marginTop: 8, fontSize: 12 }}>
-          Social login needs a development build configured with Google / Facebook ids (see README).
-        </Body>
-      ) : null}
-      <View style={{ marginTop: 16, gap: 12 }}>
-        <Link href="/register" style={{ color: colors.accent }}>
+      <View style={{ marginTop: space.lg, gap: space.md }}>
+        <Link href="/register" style={styles.link}>
           Create an account
         </Link>
-        <Link href="/forgot" style={{ color: colors.accent }}>
+        <Link href="/forgot" style={styles.link}>
           Forgot your password?
         </Link>
-        <Text style={{ color: colors.muted }} onPress={() => router.push('/server')}>
-          Server: {getApiUrl()} (change)
-        </Text>
       </View>
     </Screen>
   );

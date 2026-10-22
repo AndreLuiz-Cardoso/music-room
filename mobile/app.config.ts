@@ -1,8 +1,6 @@
 import type { ExpoConfig } from 'expo/config';
 
-// Values come from mobile/.env (ignored by git, see .env.example). The Expo CLI loads that
-// file before evaluating this config. Social login native modules are only configured when
-// their ids are present, so the project still builds without them.
+// Values from mobile/.env (loaded by the Expo CLI); social modules only when their ids are set.
 const env = process.env;
 
 const plugins: ExpoConfig['plugins'] = [
@@ -53,7 +51,7 @@ const config: ExpoConfig = {
   android: {
     package: env.ANDROID_PACKAGE ?? 'com.musicroom.app',
     adaptiveIcon: {
-      backgroundColor: '#121212',
+      backgroundColor: '#000000',
       foregroundImage: './assets/android-icon-foreground.png',
       backgroundImage: './assets/android-icon-background.png',
       monochromeImage: './assets/android-icon-monochrome.png',

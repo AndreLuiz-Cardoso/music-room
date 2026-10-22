@@ -4,9 +4,9 @@ import { Pressable } from 'react-native';
 import { Body, Button, Card, Empty, ErrorText, Input, Loading, Row, Screen, Section, Title } from '@/components/ui';
 import { api } from '@/lib/api';
 import { attempt, useLoader } from '@/lib/hooks';
-import type { UserSummary } from '@/lib/types';
+import type { UserCard } from '@/lib/types';
 
-function UserRow({ user, children }: { user: UserSummary; children?: React.ReactNode }) {
+function UserRow({ user, children }: { user: UserCard; children?: React.ReactNode }) {
   return (
     <Card>
       <Row style={{ justifyContent: 'space-between' }}>
@@ -24,7 +24,7 @@ export default function FriendsScreen() {
   const { data, error, loading, reload } = useLoader(() => api.friends.list());
   const [query, setQuery] = useState('');
   const [genre, setGenre] = useState('');
-  const [results, setResults] = useState<UserSummary[] | null>(null);
+  const [results, setResults] = useState<UserCard[] | null>(null);
 
   const q = query.trim();
   const g = genre.trim();
@@ -49,7 +49,7 @@ export default function FriendsScreen() {
           {results.length === 0 ? <Empty text="Nobody found" /> : null}
           {results.map((u) => (
             <UserRow key={u.id} user={u}>
-              {known.has(u.id) ? null : <Button small title="Add" onPress={() => add(u.id)} />}
+              {known.has(u.id) ? null : <Button small variant="secondary" title="Add" onPress={() => add(u.id)} />}
             </UserRow>
           ))}
         </Section>
@@ -60,7 +60,7 @@ export default function FriendsScreen() {
         <Section title="Requests received">
           {data.received.map((u) => (
             <UserRow key={u.id} user={u}>
-              <Button small title="Accept" onPress={() => add(u.id)} />
+              <Button small variant="secondary" title="Accept" onPress={() => add(u.id)} />
               <Button small variant="secondary" title="Decline" onPress={() => remove(u.id)} />
             </UserRow>
           ))}

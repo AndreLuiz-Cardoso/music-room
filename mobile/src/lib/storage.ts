@@ -2,8 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-// Secrets (the refresh token) go to the OS keystore (Keychain / Android Keystore) through
-// SecureStore. The web has no equivalent, so it falls back to AsyncStorage (localStorage).
+// Refresh token in the OS keystore via SecureStore; the web has none, so AsyncStorage instead.
 const secureAvailable = Platform.OS !== 'web';
 
 export const secureStorage = {

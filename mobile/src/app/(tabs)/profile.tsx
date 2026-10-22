@@ -1,9 +1,7 @@
-import { router } from 'expo-router';
 import { useState } from 'react';
-import { Body, Button, ErrorText, Input, Row, Screen, Section, Title } from '@/components/ui';
+import { Body, Button, ErrorText, Input, Row, Screen, Section, Title, space } from '@/components/ui';
 import { api, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { getApiUrl } from '@/lib/client';
 import { attempt, notify } from '@/lib/hooks';
 import { SocialCancelled, facebookAccessToken, googleIdToken, socialAvailability } from '@/lib/social';
 import type { Me } from '@/lib/types';
@@ -59,10 +57,10 @@ function ProfileForm({ user }: { user: Me }) {
 
   async function changePassword() {
     try {
-      await api.me.changePassword(user.hasPassword ? currentPassword : undefined, newPassword);
+      const updated = await api.me.changePassword(user.hasPassword ? currentPassword : undefined, newPassword);
       setCurrentPassword('');
       setNewPassword('');
-      setUser(await api.me.get());
+      setUser(updated);
       notify('Password updated');
     } catch (err) {
       notify('Error', errorMessage(err));
@@ -71,8 +69,7 @@ function ProfileForm({ user }: { user: Me }) {
 
   return (
     <Screen>
-      <Title>My profile</Title>
-      <Body muted>{user.email}</Body>
+      <Title subtitle={user.email}>Profile</Title>
 
       <Section title="Public">
         <Input label="Name" {...field('displayName')} autoCapitalize="words" />
@@ -90,17 +87,15 @@ function ProfileForm({ user }: { user: Me }) {
 
       <Section title="Linked accounts">
         {(['google', 'facebook'] as const).map((p) => (
-          <Row key={p} style={{ justifyContent: 'space-between', marginBottom: 8 }}>
+          <Row key={p} style={{ justifyContent: 'space-between', marginBottom: space.sm }}>
             <Body>
               {p === 'google' ? 'Google' : 'Facebook'}: {user.linkedProviders[p] ? 'linked' : 'not linked'}
             </Body>
             {user.linkedProviders[p] ? (
               <Button small variant="secondary" title="Unlink" onPress={() => attempt(() => api.me.unlink(p)).then((me) => me && setUser(me))} />
             ) : socialAvailability[p] ? (
-              <Button small title="Link" onPress={() => link(p)} />
-            ) : (
-              <Body muted>unavailable in this build</Body>
-            )}
+              <Button small variant="secondary" title="Link" onPress={() => link(p)} />
+            ) : null}
           </Row>
         ))}
       </Section>
@@ -111,11 +106,7 @@ function ProfileForm({ user }: { user: Me }) {
         <Button title="Update password" variant="secondary" onPress={changePassword} disabled={newPassword.length < 8} />
       </Section>
 
-      <Section title="App">
-        <Body muted>Server: {getApiUrl()}</Body>
-        <Button title="Change server address" variant="secondary" onPress={() => router.push('/server')} />
-        <Button title="Log out" variant="danger" onPress={logout} />
-      </Section>
+      <Button title="Log out" variant="danger" onPress={logout} />
     </Screen>
   );
 }

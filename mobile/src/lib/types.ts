@@ -3,11 +3,17 @@
 export type Visibility = 'PUBLIC' | 'PRIVATE';
 export type EventLicense = 'EVERYONE' | 'INVITED_ONLY' | 'LOCATION_TIME';
 export type PlaylistLicense = 'EVERYONE' | 'INVITED_ONLY';
+/** Which events or playlists a list shows. */
+export type ListFilter = 'all' | 'mine' | 'invited';
 
 export interface UserSummary {
   id: string;
   displayName: string;
   avatarUrl: string | null;
+}
+
+/** A user in search results and friend lists, which show their music taste. */
+export interface UserCard extends UserSummary {
   musicPreferences: string[];
 }
 
@@ -70,7 +76,6 @@ export interface EventTrack extends TrackFields {
   id: string;
   score: number;
   status: 'QUEUED' | 'PLAYING' | 'PLAYED';
-  suggestedById: string;
   createdAt: string;
 }
 
@@ -79,6 +84,9 @@ export interface EventLocation {
   longitude: number;
   radiusMeters: number;
 }
+
+/** What the API shows of an event's location: the coordinates only to its owner. */
+export type EventArea = Pick<EventLocation, 'radiusMeters'> & Partial<Pick<EventLocation, 'latitude' | 'longitude'>>;
 
 export interface VoteWindow {
   startsAt: string;
@@ -92,7 +100,6 @@ interface EventCommon {
   owner: UserSummary;
   visibility: Visibility;
   license: EventLicense;
-  location: EventLocation | null;
   voteWindow: VoteWindow | null;
   createdAt: string;
 }
@@ -103,6 +110,7 @@ export interface EventSummary extends EventCommon {
 }
 
 export interface EventState extends EventCommon {
+  location: EventArea | null;
   version: number;
   nowPlaying: EventTrack | null;
   queue: EventTrack[];
@@ -120,7 +128,6 @@ export interface EventDetail extends EventState {
 export interface PlaylistTrack extends TrackFields {
   id: string;
   position: number;
-  addedById: string;
 }
 
 interface PlaylistCommon {
@@ -170,12 +177,8 @@ export interface DeviceState {
   id: string;
   name: string;
   owner: UserSummary;
-  platform: string | null;
-  model: string | null;
-  appVersion: string | null;
   playback: Playback;
   version: number;
-  lastSeenAt: string;
 }
 
 export interface DeviceDetail extends DeviceState {

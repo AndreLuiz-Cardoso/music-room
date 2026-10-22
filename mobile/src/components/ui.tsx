@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import type { ComponentProps, ReactNode } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -12,15 +13,52 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+// "True-black flat": elevation by lightness alone (no borders or shadows on cards), the primary action
+// inverted to white, and the one hue (lime) only on data. Every text colour holds 4.5:1 on bg and card.
 export const colors = {
-  bg: '#121212',
-  card: '#1e1e1e',
-  border: '#2c2c2c',
-  text: '#f2f2f2',
-  muted: '#9a9a9a',
-  accent: '#1db954',
-  danger: '#e5484d',
-  warning: '#f5a623',
+  bg: '#000000',
+  card: '#111111',
+  raised: '#2A2A2A',
+  border: '#1A1A1A',
+  // inputs and chips need a 3:1 edge against the background (the style's #444 is 2.2:1)
+  control: '#666666',
+  text: '#FFFFFF',
+  muted: '#B4B4B4',
+  faint: '#949494',
+  accent: '#C6F24E',
+  danger: '#E5484D',
+  warning: '#E5A93B',
+  // status pills: a hue on a dark tint of itself
+  pillNeutral: '#222222',
+  pillAccent: '#222A10',
+  pillWarning: '#2B2414',
+  scrim: '#000000CC',
+};
+
+// md is the one gap between blocks, lg the phone's side margin
+export const space = { xs: 4, sm: 8, md: 14, lg: 20, xl: 32, xxl: 48 };
+
+export const radius = { sm: 4, md: 10, lg: 20, pill: 999 };
+
+/** Loaded in the root layout. A custom font has one family per weight, so styles set fontFamily, never fontWeight. */
+export const fonts = {
+  display: 'Righteous_400Regular',
+  regular: 'Poppins_400Regular',
+  medium: 'Poppins_500Medium',
+  semibold: 'Poppins_600SemiBold',
+  bold: 'Poppins_700Bold',
+};
+
+/** One icon set (Ionicons) for the whole app: outline, filled only for the selected tab. */
+export type IconName = ComponentProps<typeof Ionicons>['name'];
+
+/** Shared by every Stack navigator. */
+export const stackOptions = {
+  headerStyle: { backgroundColor: colors.bg },
+  headerTintColor: colors.text,
+  headerTitleStyle: { fontFamily: fonts.semibold },
+  headerShadowVisible: false,
+  contentStyle: { backgroundColor: colors.bg },
 };
 
 export function Screen({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) {
@@ -32,14 +70,25 @@ export function Screen({ children, scroll = true }: { children: ReactNode; scrol
   );
 }
 
-export function Title({ children }: { children: ReactNode }) {
-  return <Text style={styles.title}>{children}</Text>;
+/** The screen's one heading, an optional line about it, and at most the one primary action on its right. */
+export function Title({ children, subtitle, right }: { children: ReactNode; subtitle?: ReactNode; right?: ReactNode }) {
+  return (
+    <View style={styles.header}>
+      <View style={styles.rowBetween}>
+        <Text role="heading" style={styles.title}>
+          {children}
+        </Text>
+        {right}
+      </View>
+      {subtitle ? <Text style={[styles.body, styles.muted]}>{subtitle}</Text> : null}
+    </View>
+  );
 }
 
 export function Section({ title, right, children }: { title: string; right?: ReactNode; children?: ReactNode }) {
   return (
     <View style={styles.section}>
-      <View style={styles.rowBetween}>
+      <View style={[styles.rowBetween, styles.sectionHeader]}>
         <Text style={styles.sectionTitle}>{title}</Text>
         {right}
       </View>
@@ -56,6 +105,7 @@ type Variant = 'primary' | 'secondary' | 'danger';
 
 export function Button({
   title,
+  icon,
   onPress,
   variant = 'primary',
   small,
@@ -63,17 +113,21 @@ export function Button({
   loading,
 }: {
   title: string;
+  icon?: IconName;
   onPress: () => void;
   variant?: Variant;
   small?: boolean;
   disabled?: boolean;
   loading?: boolean;
 }) {
+  const textColor = { primary: colors.bg, secondary: colors.text, danger: colors.danger }[variant];
   return (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
       disabled={disabled || loading}
+      // a small button is 36pt tall: the slop brings its touch area to 44pt
+      hitSlop={small ? space.xs : undefined}
       style={({ pressed }) => [
         styles.button,
         small && styles.buttonSmall,
@@ -83,19 +137,50 @@ export function Button({
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={colors.text} />
+        <ActivityIndicator color={textColor} />
       ) : (
-        <Text style={[styles.buttonText, small && { fontSize: 13 }]}>{title}</Text>
+        <>
+          {icon ? <Ionicons name={icon} size={18} color={textColor} /> : null}
+          <Text style={[styles.buttonText, { color: textColor }, small && { fontSize: 13 }]}>{title}</Text>
+        </>
       )}
+    </Pressable>
+  );
+}
+
+/** An icon-only control, 36pt with slop to a 44pt touch area; `label` is what screen readers say. */
+export function IconButton({
+  icon,
+  label,
+  onPress,
+  disabled,
+  color = colors.text,
+}: {
+  icon: IconName;
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  color?: string;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      disabled={disabled}
+      hitSlop={space.xs}
+      style={({ pressed }) => [styles.iconButton, disabled ? { opacity: 0.3 } : pressed && { opacity: 0.6 }]}
+    >
+      <Ionicons name={icon} size={20} color={color} />
     </Pressable>
   );
 }
 
 export function Input({ label, ...props }: TextInputProps & { label?: string }) {
   return (
-    <View style={{ marginBottom: 12 }}>
+    <View style={{ marginBottom: space.md }}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
-      <TextInput placeholderTextColor={colors.muted} autoCapitalize="none" style={styles.input} {...props} />
+      <TextInput placeholderTextColor={colors.faint} autoCapitalize="none" style={styles.input} {...props} />
     </View>
   );
 }
@@ -125,16 +210,17 @@ export function Choice<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <View style={{ marginBottom: 12 }}>
+    <View style={{ marginBottom: space.md }}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
       <View style={styles.choice}>
         {options.map((o) => (
           <Pressable
             key={o.value}
             onPress={() => onChange(o.value)}
+            hitSlop={space.xs}
             style={[styles.choiceItem, value === o.value && styles.choiceActive]}
           >
-            <Text style={[styles.choiceText, value === o.value && { color: colors.bg }]}>{o.label}</Text>
+            <Text style={[styles.choiceText, value === o.value && { color: colors.text }]}>{o.label}</Text>
           </Pressable>
         ))}
       </View>
@@ -142,10 +228,17 @@ export function Choice<T extends string>({
   );
 }
 
-export function Badge({ text, color = colors.muted }: { text: string; color?: string }) {
+const badgeTones = {
+  neutral: { backgroundColor: colors.pillNeutral, color: colors.muted },
+  accent: { backgroundColor: colors.pillAccent, color: colors.accent },
+  warning: { backgroundColor: colors.pillWarning, color: colors.warning },
+};
+
+export function Badge({ text, tone = 'neutral' }: { text: string; tone?: keyof typeof badgeTones }) {
+  const { backgroundColor, color } = badgeTones[tone];
   return (
-    <View style={[styles.badge, { borderColor: color }]}>
-      <Text style={{ color, fontSize: 11, fontWeight: '600' }}>{text}</Text>
+    <View style={[styles.badge, { backgroundColor }]}>
+      <Text style={[styles.badgeText, { color }]}>{text}</Text>
     </View>
   );
 }
@@ -156,11 +249,11 @@ export function ErrorText({ children }: { children: ReactNode }) {
 }
 
 export function Loading() {
-  return <ActivityIndicator style={{ marginTop: 32 }} color={colors.accent} />;
+  return <ActivityIndicator style={{ marginTop: space.xl }} color={colors.muted} />;
 }
 
 export function Empty({ text }: { text: string }) {
-  return <Text style={[styles.body, styles.muted, { textAlign: 'center', marginVertical: 16 }]}>{text}</Text>;
+  return <Text style={[styles.body, styles.muted, { textAlign: 'center', marginVertical: space.lg }]}>{text}</Text>;
 }
 
 export function Cover({ uri, size = 44 }: { uri: string | null; size?: number }) {
@@ -184,11 +277,11 @@ export function TrackLine({
   return (
     <View style={[styles.track, highlight && { borderColor: colors.accent }]}>
       <Cover uri={coverUrl} />
-      <View style={{ flex: 1, marginHorizontal: 10 }}>
-        <Text numberOfLines={1} style={[styles.body, { fontWeight: '600' }]}>
+      <View style={{ flex: 1, marginHorizontal: space.md }}>
+        <Text numberOfLines={1} style={[styles.body, styles.strong]}>
           {title}
         </Text>
-        <Text numberOfLines={1} style={[styles.body, styles.muted, { fontSize: 13 }]}>
+        <Text numberOfLines={1} style={styles.caption}>
           {artist}
         </Text>
       </View>
@@ -199,59 +292,84 @@ export function TrackLine({
 
 export const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  pad: { padding: 16, paddingBottom: 48 },
-  title: { color: colors.text, fontSize: 24, fontWeight: '700', marginBottom: 12 },
-  section: { marginTop: 20 },
-  sectionTitle: { color: colors.text, fontSize: 17, fontWeight: '700', marginBottom: 8 },
-  body: { color: colors.text, fontSize: 15 },
+  pad: { padding: space.lg, paddingBottom: space.xxl },
+  header: { gap: space.xs, marginBottom: space.lg },
+  // cards, rows and fields already end on a md margin, so sections land about xl apart
+  section: { marginTop: space.lg },
+  sectionHeader: { marginBottom: space.md },
+
+  // type scale
+  display: { color: colors.accent, fontFamily: fonts.display, fontSize: 34 },
+  // Righteous is the wordmark's face only (`display`); screen titles stay in the text face
+  title: { color: colors.text, fontFamily: fonts.semibold, fontSize: 24, flexShrink: 1 },
+  sectionTitle: { color: colors.text, fontFamily: fonts.bold, fontSize: 17 },
+  itemTitle: { color: colors.text, fontFamily: fonts.bold, fontSize: 16 },
+  body: { color: colors.text, fontFamily: fonts.regular, fontSize: 15 },
+  // links carry no hue: the accent is for data only
+  link: { color: colors.text, fontFamily: fonts.medium, fontSize: 15, textDecorationLine: 'underline' },
+  label: { color: colors.muted, fontFamily: fonts.medium, fontSize: 13, marginBottom: space.sm },
+  caption: { color: colors.muted, fontFamily: fonts.regular, fontSize: 13 },
+  strong: { fontFamily: fonts.semibold },
   muted: { color: colors.muted },
-  label: { color: colors.muted, fontSize: 13, marginBottom: 4 },
+
   input: {
     backgroundColor: colors.card,
     color: colors.text,
-    borderColor: colors.border,
+    fontFamily: fonts.regular,
+    borderColor: colors.control,
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderRadius: radius.md,
+    minHeight: 44,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
     fontSize: 15,
   },
+  // the primary is made primary by inversion, never by the accent
   button: {
-    backgroundColor: colors.accent,
-    borderRadius: 24,
-    paddingVertical: 12,
-    paddingHorizontal: 18,
+    backgroundColor: colors.text,
+    borderRadius: radius.pill,
+    minHeight: 44,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.lg,
+    flexDirection: 'row',
+    gap: space.xs,
     alignItems: 'center',
-    marginVertical: 4,
+    justifyContent: 'center',
+    marginVertical: space.xs,
   },
-  buttonSmall: { paddingVertical: 6, paddingHorizontal: 12, marginVertical: 0 },
-  buttonSecondary: { backgroundColor: colors.border },
-  buttonDanger: { backgroundColor: colors.danger },
-  buttonText: { color: colors.text, fontWeight: '700', fontSize: 15 },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 10,
+  buttonSmall: { minHeight: 36, paddingVertical: space.xs, paddingHorizontal: space.md, marginVertical: 0 },
+  buttonSecondary: { backgroundColor: colors.raised },
+  // a destructive action is never the screen's primary: outline only, set apart from what precedes it
+  buttonDanger: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.danger, marginTop: space.lg },
+  // shrinks so a long title wraps inside the row instead of overflowing it
+  buttonText: { fontFamily: fonts.semibold, fontSize: 15, flexShrink: 1, textAlign: 'center' },
+  iconButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  card: { backgroundColor: colors.card, borderRadius: radius.lg, padding: space.lg, marginBottom: space.md },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space.sm, flexWrap: 'wrap' },
+  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md },
+  choice: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  choiceItem: {
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.control,
+    borderRadius: radius.pill,
+    minHeight: 36,
+    justifyContent: 'center',
+    paddingHorizontal: space.md,
   },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  choice: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  choiceItem: { borderWidth: 1, borderColor: colors.border, borderRadius: 16, paddingVertical: 6, paddingHorizontal: 12 },
-  choiceActive: { backgroundColor: colors.accent, borderColor: colors.accent },
-  choiceText: { color: colors.text, fontSize: 13 },
-  badge: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1 },
-  error: { color: colors.danger, marginVertical: 8 },
-  cover: { borderRadius: 4, backgroundColor: colors.border },
+  // selected by a lighter fill and a white edge: white fill is the primary button's alone
+  choiceActive: { backgroundColor: colors.raised, borderColor: colors.text },
+  choiceText: { color: colors.muted, fontFamily: fonts.medium, fontSize: 13 },
+  badge: { borderRadius: radius.pill, paddingHorizontal: space.sm, paddingVertical: 2 },
+  badgeText: { fontFamily: fonts.semibold, fontSize: 12 },
+  error: { color: colors.danger, fontFamily: fonts.regular, fontSize: 15, marginVertical: space.sm },
+  cover: { borderRadius: radius.sm, backgroundColor: colors.raised },
   track: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.card,
-    borderRadius: 8,
-    padding: 8,
-    marginBottom: 6,
+    borderRadius: radius.lg,
+    padding: space.md,
+    marginBottom: space.sm,
     borderWidth: 1,
     borderColor: colors.card,
   },

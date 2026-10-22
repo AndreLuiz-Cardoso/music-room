@@ -3,19 +3,18 @@ import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { mediaUrl } from '@/lib/client';
+import { useSkipUnplayable } from '@/lib/hooks';
 import { newer, useRealtime } from '@/lib/realtime';
 import type { DeviceState } from '@/lib/types';
-import { Button, Cover, colors } from './ui';
+import { Button, Cover, colors, space, styles } from './ui';
 
 /** expo-audio exposes the volume as a writable property of the native player object. */
 function setVolume(player: AudioPlayer, volume: number) {
   player.volume = volume;
 }
 
-/**
- * Plays what the back-end says this device should play. Commands (from this phone or from a
- * friend holding a delegation) change the state on the server, which pushes it here.
- */
+/** Plays what the server says this device plays; commands from owner or delegates arrive pushed. */
 export function DevicePlayer() {
   const { deviceId } = useAuth();
   const [state, setState] = useState<DeviceState | null>(null);
@@ -31,8 +30,13 @@ export function DevicePlayer() {
 
   const playback = state?.playback;
   const track = playback ? playback.queue[playback.index] : undefined;
-  const url = track?.previewUrl ?? null;
+  const url = mediaUrl(track?.previewUrl);
   const index = playback?.index ?? 0;
+
+  // the same index can hold another track after a new queue: the version tells them apart
+  useSkipUnplayable(player, state && track ? `${state.version}:${index}` : null, !!url, !!deviceId && !!playback?.isPlaying, () => {
+    if (deviceId) api.devices.command(deviceId, 'NEXT').catch(() => {});
+  });
 
   useEffect(() => {
     if (url) player.replace(url);
@@ -62,17 +66,18 @@ export function DevicePlayer() {
         backgroundColor: colors.card,
         borderTopColor: colors.border,
         borderTopWidth: 1,
-        padding: 8,
-        gap: 8,
+        padding: space.sm,
+        gap: space.sm,
       }}
     >
       <Cover uri={track.coverUrl} size={36} />
       <View style={{ flex: 1 }}>
-        <Text numberOfLines={1} style={{ color: colors.text, fontWeight: '600' }}>
+        <Text numberOfLines={1} style={[styles.body, styles.strong]}>
           {track.title}
         </Text>
-        <Text numberOfLines={1} style={{ color: colors.muted, fontSize: 12 }}>
-          {track.artist} · {url ? 'preview 30s' : 'no preview available'}
+        <Text numberOfLines={1} style={styles.caption}>
+          {track.artist}
+          {url ? '' : ' · Preview unavailable'}
         </Text>
       </View>
       <Button small variant="secondary" title={playback?.isPlaying ? 'Pause' : 'Play'} onPress={() => send(playback?.isPlaying ? 'PAUSE' : 'PLAY')} />

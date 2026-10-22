@@ -1,8 +1,9 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Modal, Pressable, Text, View } from 'react-native';
+import { Modal, Text, View } from 'react-native';
 import { TrackPicker, UserPicker } from '@/components/pickers';
-import { Badge, Body, Button, Card, Empty, ErrorText, Loading, Row, Screen, Section, TrackLine, colors, styles } from '@/components/ui';
+import { AccessBadges, InviteList } from '@/components/shared';
+import { Body, Button, Card, Empty, ErrorText, IconButton, Loading, Row, Screen, Section, TrackLine, colors, space, styles } from '@/components/ui';
 import { ApiError, api, errorMessage } from '@/lib/api';
 import { attempt, notify, useLoader } from '@/lib/hooks';
 import { newer, useRealtime } from '@/lib/realtime';
@@ -51,24 +52,25 @@ export default function PlaylistScreen() {
 
   return (
     <Screen>
-      <Stack.Screen options={{ title: playlist.name }} />
+      <Stack.Screen
+        options={{
+          title: playlist.name,
+          headerRight: playlist.isOwner
+            ? () => <IconButton icon="settings-outline" label="Settings" onPress={() => router.push({ pathname: '/playlist/form', params: { id } })} />
+            : undefined,
+        }}
+      />
       {playlist.description ? <Body muted>{playlist.description}</Body> : null}
-      <Row style={{ marginVertical: 8 }}>
-        <Badge text={playlist.visibility.toLowerCase()} color={playlist.visibility === 'PUBLIC' ? colors.accent : colors.warning} />
-        <Badge text={playlist.license === 'EVERYONE' ? 'everyone edits' : 'invited editors'} />
+      <Row style={{ marginVertical: space.sm }}>
+        <AccessBadges kind="playlists" visibility={playlist.visibility} license={playlist.license} />
         <Body muted>by {playlist.owner.displayName}</Body>
       </Row>
-      {!playlist.canEdit ? <Text style={{ color: colors.warning }}>Read only: only invited users can edit this playlist.</Text> : null}
+      {!playlist.canEdit ? <Text style={[styles.body, { color: colors.warning }]}>Read only: only invited users can edit this playlist.</Text> : null}
 
-      <Row style={{ marginTop: 8 }}>
+      <Row style={{ marginTop: space.md }}>
         {playlist.canEdit ? <Button small title="Add a track" onPress={() => setPicking(true)} /> : null}
         <Button small variant="secondary" title="Play on a device" onPress={chooseDevice} disabled={tracks.length === 0} />
-        {playlist.isOwner ? (
-          <>
-            <Button small variant="secondary" title="Settings" onPress={() => router.push({ pathname: '/playlist/form', params: { id } })} />
-            <Button small variant="secondary" title="Invite" onPress={() => setInviting(true)} />
-          </>
-        ) : null}
+        {playlist.isOwner ? <Button small variant="secondary" title="Invite" onPress={() => setInviting(true)} /> : null}
       </Row>
 
       <Section title={`${tracks.length} tracks`}>
@@ -81,10 +83,10 @@ export default function PlaylistScreen() {
             coverUrl={t.coverUrl}
             right={
               playlist.canEdit ? (
-                <View style={{ flexDirection: 'row', gap: 4 }}>
-                  <Arrow label="↑" disabled={i === 0} onPress={() => moveUp(i)} />
-                  <Arrow label="↓" disabled={i === tracks.length - 1} onPress={() => moveDown(i)} />
-                  <Arrow label="✕" onPress={() => act(() => api.playlists.removeTrack(id, t.id))} />
+                <View style={{ flexDirection: 'row', gap: space.xs }}>
+                  <IconButton icon="arrow-up-outline" label="Move up" disabled={i === 0} onPress={() => moveUp(i)} />
+                  <IconButton icon="arrow-down-outline" label="Move down" disabled={i === tracks.length - 1} onPress={() => moveDown(i)} />
+                  <IconButton icon="close-outline" label="Remove" onPress={() => act(() => api.playlists.removeTrack(id, t.id))} />
                 </View>
               ) : null
             }
@@ -92,7 +94,7 @@ export default function PlaylistScreen() {
         ))}
       </Section>
 
-      {playlist.isOwner ? <InviteList playlistId={id} /> : null}
+      {playlist.isOwner ? <InviteList kind="playlists" id={id} /> : null}
 
       <TrackPicker
         visible={picking}
@@ -112,9 +114,9 @@ export default function PlaylistScreen() {
         }}
       />
       <Modal visible={!!devices} transparent animationType="fade" onRequestClose={() => setDevices(null)}>
-        <View style={{ flex: 1, backgroundColor: '#000a', justifyContent: 'center', padding: 24 }}>
-          <View style={[styles.card, { padding: 16 }]}>
-            <Text style={styles.sectionTitle}>Play on...</Text>
+        <View style={{ flex: 1, backgroundColor: colors.scrim, justifyContent: 'center', padding: space.xl }}>
+          <View style={[styles.card, { padding: space.lg }]}>
+            <Text style={[styles.sectionTitle, styles.sectionHeader]}>Play on...</Text>
             {devices?.length === 0 ? <Empty text="No device available" /> : null}
             {devices?.map((d) => (
               <Card key={d.id} onPress={() => playOn(d)}>
@@ -127,28 +129,5 @@ export default function PlaylistScreen() {
         </View>
       </Modal>
     </Screen>
-  );
-}
-
-function Arrow({ label, onPress, disabled }: { label: string; onPress: () => void; disabled?: boolean }) {
-  return (
-    <Pressable onPress={onPress} disabled={disabled} style={{ padding: 6, opacity: disabled ? 0.3 : 1 }}>
-      <Text style={{ color: colors.text, fontSize: 18 }}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function InviteList({ playlistId }: { playlistId: string }) {
-  const { data, reload } = useLoader(() => api.playlists.invites(playlistId), [playlistId]);
-  if (!data) return null;
-  return (
-    <Section title={`Invited (${data.length})`} right={<Button small variant="secondary" title="Refresh" onPress={reload} />}>
-      {data.map((u) => (
-        <Row key={u.id} style={{ justifyContent: 'space-between', marginBottom: 6 }}>
-          <Body>{u.displayName}</Body>
-          <Button small variant="secondary" title="Remove" onPress={() => attempt(() => api.playlists.uninvite(playlistId, u.id)).then(reload)} />
-        </Row>
-      ))}
-    </Section>
   );
 }

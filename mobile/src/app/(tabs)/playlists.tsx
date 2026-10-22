@@ -1,40 +1,28 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
 import { Text } from 'react-native';
-import { Badge, Body, Button, Card, Choice, Empty, ErrorText, Loading, Row, Screen, Title, colors } from '@/components/ui';
+import { AccessBadges, ListControls } from '@/components/shared';
+import { Body, Button, Card, Row, Screen, Title, space, styles } from '@/components/ui';
 import { api } from '@/lib/api';
-import { useLoader } from '@/lib/hooks';
-
-type Filter = 'all' | 'mine' | 'invited';
+import { useListSearch } from '@/lib/hooks';
 
 export default function PlaylistsScreen() {
-  const [filter, setFilter] = useState<Filter>('all');
-  const { data, error, loading } = useLoader(() => api.playlists.list(filter), [filter]);
+  const search = useListSearch(api.playlists.list);
 
   return (
     <Screen>
-      <Title>Music Playlist Editor</Title>
-      <Body muted>Build playlists in real time with your friends.</Body>
-      <Button title="New playlist" onPress={() => router.push('/playlist/form')} />
-      <Choice
-        value={filter}
-        onChange={setFilter}
-        options={[
-          { value: 'all', label: 'All' },
-          { value: 'mine', label: 'Mine' },
-          { value: 'invited', label: 'Invited' },
-        ]}
-      />
-      <ErrorText>{error}</ErrorText>
-      {loading && !data ? <Loading /> : null}
-      {data?.length === 0 ? <Empty text="No playlist yet" /> : null}
-      {data?.map((p) => (
+      <Title
+        subtitle="Build playlists in real time with your friends."
+        right={<Button small title="New playlist" onPress={() => router.push('/playlist/form')} />}
+      >
+        Playlists
+      </Title>
+      <ListControls noun="playlist" search={search} />
+      {search.data?.map((p) => (
         <Card key={p.id} onPress={() => router.push(`/playlist/${p.id}`)}>
-          <Text style={{ color: colors.text, fontSize: 16, fontWeight: '700' }}>{p.name}</Text>
+          <Text style={styles.itemTitle}>{p.name}</Text>
           {p.description ? <Body muted>{p.description}</Body> : null}
-          <Row style={{ marginTop: 6 }}>
-            <Badge text={p.visibility.toLowerCase()} color={p.visibility === 'PUBLIC' ? colors.accent : colors.warning} />
-            <Badge text={p.license === 'EVERYONE' ? 'everyone edits' : 'invited editors'} />
+          <Row style={{ marginTop: space.sm }}>
+            <AccessBadges kind="playlists" visibility={p.visibility} license={p.license} />
             <Body muted>
               {p.trackCount} tracks · {p.isOwner ? 'mine' : `by ${p.owner.displayName}`}
             </Body>

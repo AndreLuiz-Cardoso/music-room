@@ -3,8 +3,7 @@ import { io, type Socket } from 'socket.io-client';
 import { getAccessToken, refreshSession } from './api';
 import { getApiUrl } from './client';
 
-// One Socket.IO connection for the whole app. Screens subscribe to rooms
-// (event:<id>, playlist:<id>, device:<id>); subscriptions are replayed after a reconnection.
+// One Socket.IO connection for the app; room subscriptions are replayed after each reconnection.
 
 let socket: Socket | null = null;
 const rooms = new Map<string, number>();
@@ -19,8 +18,16 @@ function connect(): Socket {
   s.on('connect', () => {
     for (const room of rooms.keys()) s.emit('subscribe', room);
   });
+  // Other failures are retried by Socket.IO itself; a refusal by the server is not.
   s.on('connect_error', async (err) => {
-    if (err.message === 'UNAUTHORIZED' && (await refreshSession())) s.connect();
+    if (err.message !== 'UNAUTHORIZED') return;
+    if (await refreshSession()) s.connect();
+    // the refresh failed for a moment (network, 429) but the session is still there: try again
+    else if (getAccessToken()) setTimeout(() => socket === s && s.connect(), 5000);
+  });
+  // The server closes the socket when its token expires and Socket.IO won't reconnect: do it here.
+  s.on('disconnect', (reason) => {
+    if (reason === 'io server disconnect') s.connect();
   });
   socket = s;
   return s;
@@ -39,7 +46,11 @@ export function useRealtime<T>(room: string | null, event: string, handler: (pay
   useEffect(() => {
     if (!room) return;
     const s = connect();
-    const listener = (payload: T) => onMessage(payload);
+    // The shared socket gets this event for every joined room: keep only this room's object.
+    const id = room.slice(room.indexOf(':') + 1);
+    const listener = (payload: T & { id?: string }) => {
+      if (payload?.id === id) onMessage(payload);
+    };
     s.on(event, listener);
     rooms.set(room, (rooms.get(room) ?? 0) + 1);
     if (s.connected) s.emit('subscribe', room);

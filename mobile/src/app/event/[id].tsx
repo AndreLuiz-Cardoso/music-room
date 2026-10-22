@@ -3,9 +3,11 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { TrackPicker, UserPicker } from '@/components/pickers';
-import { Badge, Body, Button, Empty, ErrorText, Loading, Row, Screen, Section, TrackLine, colors } from '@/components/ui';
+import { AccessBadges, InviteList } from '@/components/shared';
+import { Body, Button, Empty, ErrorText, IconButton, Loading, Row, Screen, Section, TrackLine, colors, space, styles } from '@/components/ui';
 import { api, errorMessage, type Geo } from '@/lib/api';
-import { attempt, notify, useLoader } from '@/lib/hooks';
+import { mediaUrl } from '@/lib/client';
+import { notify, useLoader, useSkipUnplayable } from '@/lib/hooks';
 import { currentPosition } from '@/lib/location';
 import { newer, useRealtime } from '@/lib/realtime';
 import type { EventDetail, EventState } from '@/lib/types';
@@ -23,7 +25,7 @@ function HostPlayer({ event, onNext }: { event: EventDetail; onNext: () => void 
   const [on, setOn] = useState(false);
   const player = useAudioPlayer(null);
   const status = useAudioPlayerStatus(player);
-  const url = event.nowPlaying?.previewUrl ?? null;
+  const url = mediaUrl(event.nowPlaying?.previewUrl);
   const entryId = event.nowPlaying?.id;
 
   useEffect(() => {
@@ -37,17 +39,20 @@ function HostPlayer({ event, onNext }: { event: EventDetail; onNext: () => void 
     if (on && status.didJustFinish) onNext();
   }, [on, status.didJustFinish]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useSkipUnplayable(player, entryId ?? null, !!url, on, onNext);
+
+  // secondary: "Suggest" is the screen's one primary action
   return (
-    <Row>
-      <Button small title={on ? 'Stop playing here' : 'Play here'} variant={on ? 'secondary' : 'primary'} onPress={() => setOn(!on)} />
+    <>
+      <Button small variant="secondary" title={on ? 'Stop playing here' : 'Play here'} onPress={() => setOn(!on)} />
       <Button small variant="secondary" title="Next track" onPress={onNext} />
-    </Row>
+    </>
   );
 }
 
 export default function EventScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data: event, setData: setEvent, error } = useLoader(() => api.events.get(id), [id]);
+  const { data: event, setData: setEvent, error, reload } = useLoader(() => api.events.get(id), [id]);
   const [picking, setPicking] = useState(false);
   const [inviting, setInviting] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -60,6 +65,17 @@ export default function EventScreen() {
     notify('This event was deleted');
     router.back();
   });
+
+  // The vote window opens and closes without a request, and broadcasts lack canVote: refetch then.
+  const startsAt = event?.voteWindow?.startsAt;
+  const endsAt = event?.voteWindow?.endsAt;
+  useEffect(() => {
+    const timers = [startsAt, endsAt]
+      .map((t) => (t ? new Date(t).getTime() - Date.now() + 1000 : -1))
+      .filter((ms) => ms > 0 && ms < 2 ** 31 - 1)
+      .map((ms) => setTimeout(reload, ms));
+    return () => timers.forEach(clearTimeout);
+  }, [startsAt, endsAt, reload]);
 
   if (error && !event) return <Screen><ErrorText>{error}</ErrorText></Screen>;
   if (!event) return <Loading />;
@@ -94,11 +110,17 @@ export default function EventScreen() {
 
   return (
     <Screen>
-      <Stack.Screen options={{ title: event.name }} />
+      <Stack.Screen
+        options={{
+          title: event.name,
+          headerRight: event.isOwner
+            ? () => <IconButton icon="settings-outline" label="Settings" onPress={() => router.push({ pathname: '/event/form', params: { id } })} />
+            : undefined,
+        }}
+      />
       {event.description ? <Body muted>{event.description}</Body> : null}
-      <Row style={{ marginVertical: 8 }}>
-        <Badge text={event.visibility.toLowerCase()} color={event.visibility === 'PUBLIC' ? colors.accent : colors.warning} />
-        <Badge text={event.license.replace('_', ' ').toLowerCase()} />
+      <Row style={{ marginVertical: space.sm }}>
+        <AccessBadges kind="events" visibility={event.visibility} license={event.license} />
         <Body muted>by {event.owner.displayName}</Body>
       </Row>
       {event.voteWindow ? (
@@ -108,14 +130,13 @@ export default function EventScreen() {
         </Body>
       ) : null}
       {!event.canVote && event.voteDeniedReason ? (
-        <Text style={{ color: colors.warning, marginVertical: 6 }}>{denial[event.voteDeniedReason] ?? event.voteDeniedReason}</Text>
+        <Text style={[styles.body, { color: colors.warning, marginVertical: space.sm }]}>{denial[event.voteDeniedReason] ?? event.voteDeniedReason}</Text>
       ) : null}
 
       {event.isOwner ? (
         <Section title="Host">
-          <HostPlayer event={event} onNext={next} />
-          <Row style={{ marginTop: 8 }}>
-            <Button small variant="secondary" title="Settings" onPress={() => router.push({ pathname: '/event/form', params: { id } })} />
+          <Row>
+            <HostPlayer event={event} onNext={next} />
             <Button small variant="secondary" title="Invite" onPress={() => setInviting(true)} />
           </Row>
         </Section>
@@ -149,7 +170,7 @@ export default function EventScreen() {
                   style={{ alignItems: 'center', minWidth: 48, opacity: !event.canVote && !voted ? 0.4 : 1 }}
                 >
                   <Text style={{ color: voted ? colors.accent : colors.muted, fontSize: 20 }}>▲</Text>
-                  <Text style={{ color: colors.text, fontWeight: '700' }}>{t.score}</Text>
+                  <Text style={[styles.body, styles.strong]}>{t.score}</Text>
                 </Pressable>
               }
             />
@@ -158,8 +179,8 @@ export default function EventScreen() {
       </Section>
 
       {event.isOwner ? (
-        <View style={{ marginTop: 24 }}>
-          <InviteList eventId={id} />
+        <View style={{ marginTop: space.xl }}>
+          <InviteList kind="events" id={id} />
         </View>
       ) : null}
 
@@ -174,20 +195,5 @@ export default function EventScreen() {
         }}
       />
     </Screen>
-  );
-}
-
-function InviteList({ eventId }: { eventId: string }) {
-  const { data, reload } = useLoader(() => api.events.invites(eventId), [eventId]);
-  if (!data) return null;
-  return (
-    <Section title={`Invited (${data.length})`} right={<Button small variant="secondary" title="Refresh" onPress={reload} />}>
-      {data.map((u) => (
-        <Row key={u.id} style={{ justifyContent: 'space-between', marginBottom: 6 }}>
-          <Body>{u.displayName}</Body>
-          <Button small variant="secondary" title="Remove" onPress={() => attempt(() => api.events.uninvite(eventId, u.id)).then(reload)} />
-        </Row>
-      ))}
-    </Section>
   );
 }

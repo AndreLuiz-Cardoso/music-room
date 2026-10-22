@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Body, Button, ErrorText, Input, Screen } from '@/components/ui';
+import { Body, Button, ErrorText, Input, Screen, space } from '@/components/ui';
 import { api, errorMessage } from '@/lib/api';
 
 export default function RegisterScreen() {
@@ -30,7 +30,7 @@ export default function RegisterScreen() {
     return (
       <Screen>
         <Body>{done}</Body>
-        <Body muted style={{ marginVertical: 12 }}>
+        <Body muted style={{ marginVertical: space.md }}>
           You need to confirm your email address before you can log in.
         </Body>
         <Button title="Back to login" onPress={() => router.back()} />

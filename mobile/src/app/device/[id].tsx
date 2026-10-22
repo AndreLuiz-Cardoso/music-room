@@ -1,6 +1,6 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Body, Button, Choice, Cover, Empty, ErrorText, Input, Loading, Row, Screen, Section, TrackLine } from '@/components/ui';
+import { Body, Button, Choice, Cover, Empty, ErrorText, IconButton, Input, Loading, Row, Screen, Section, TrackLine, space } from '@/components/ui';
 import { TrackPicker, UserPicker } from '@/components/pickers';
 import { api, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -53,11 +53,7 @@ export default function DeviceScreen() {
   return (
     <Screen>
       <Stack.Screen options={{ title: device.name }} />
-      <Body muted>
-        {[device.platform, device.model, device.appVersion && `v${device.appVersion}`].filter(Boolean).join(' · ')}
-        {device.isOwner ? '' : ` · shared by ${device.owner.displayName}`}
-        {device.id === deviceId ? ' · this device' : ''}
-      </Body>
+      {!device.isOwner ? <Body muted>Shared by {device.owner.displayName}</Body> : device.id === deviceId ? <Body muted>This device</Body> : null}
 
       <Section title="Now playing">
         {track ? (
@@ -72,15 +68,20 @@ export default function DeviceScreen() {
         ) : (
           <Empty text="Nothing loaded: pick a track or play a playlist" />
         )}
-        <Row style={{ marginTop: 12 }}>
-          <Button small variant="secondary" title="⏮" onPress={() => send('PREVIOUS')} />
-          <Button small title={playback.isPlaying ? '❚❚ Pause' : '▶ Play'} onPress={() => send(playback.isPlaying ? 'PAUSE' : 'PLAY')} />
-          <Button small variant="secondary" title="⏭" onPress={() => send('NEXT')} />
+        <Row style={{ marginTop: space.md }}>
+          <IconButton icon="play-skip-back-outline" label="Previous" onPress={() => send('PREVIOUS')} />
+          <Button
+            small
+            icon={playback.isPlaying ? 'pause-outline' : 'play-outline'}
+            title={playback.isPlaying ? 'Pause' : 'Play'}
+            onPress={() => send(playback.isPlaying ? 'PAUSE' : 'PLAY')}
+          />
+          <IconButton icon="play-skip-forward-outline" label="Next" onPress={() => send('NEXT')} />
         </Row>
-        <Row style={{ marginTop: 12 }}>
+        <Row style={{ marginTop: space.md }}>
           <Body>Volume {playback.volume}%</Body>
-          <Button small variant="secondary" title="−" onPress={() => send('SET_VOLUME', { volume: Math.max(0, playback.volume - 10) })} />
-          <Button small variant="secondary" title="+" onPress={() => send('SET_VOLUME', { volume: Math.min(100, playback.volume + 10) })} />
+          <IconButton icon="remove-outline" label="Volume down" onPress={() => send('SET_VOLUME', { volume: Math.max(0, playback.volume - 10) })} />
+          <IconButton icon="add-outline" label="Volume up" onPress={() => send('SET_VOLUME', { volume: Math.min(100, playback.volume + 10) })} />
         </Row>
         <Button title="Play a track" variant="secondary" onPress={() => setPicking(true)} />
       </Section>
@@ -98,7 +99,7 @@ export default function DeviceScreen() {
           <Section title="Friends who can control this device">
             {device.delegations.length === 0 ? <Empty text="Nobody but you" /> : null}
             {device.delegations.map((d) => (
-              <Row key={d.user.id} style={{ justifyContent: 'space-between', marginBottom: 6 }}>
+              <Row key={d.user.id} style={{ justifyContent: 'space-between', marginBottom: space.sm }}>
                 <Body>
                   {d.user.displayName}
                   <Body muted>{d.expiresAt ? ` until ${new Date(d.expiresAt).toLocaleString()}` : ' (no limit)'}</Body>
@@ -117,7 +118,7 @@ export default function DeviceScreen() {
                 { value: '1w', label: '1 week' },
               ]}
             />
-            <Button title="Give control to a friend" onPress={() => setDelegating(true)} />
+            <Button title="Give control to a friend" variant="secondary"onPress={() => setDelegating(true)} />
           </Section>
           <Section title="Device">
             <Input placeholder={device.name} value={name ?? ''} onChangeText={setName} autoCapitalize="sentences" />
