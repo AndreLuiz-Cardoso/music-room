@@ -3,9 +3,8 @@ import { PrismaClient } from '@prisma/client';
 
 // Creates the test database when missing and applies the migrations to it.
 export default async function setup() {
-  const url = new URL(
-    process.env.TEST_DATABASE_URL ?? 'postgresql://musicroom:musicroom@localhost:5433/musicroom_test',
-  );
+  // set by vitest.config.mts
+  const url = new URL(process.env.TEST_DATABASE_URL!);
   const database = url.pathname.slice(1);
   const admin = new URL(url);
   admin.pathname = '/postgres';

@@ -1,9 +1,10 @@
 import { Type, type FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import bcrypt from 'bcryptjs';
+import { issueSession, revokeAllSessions } from '../auth/tokens';
 import { config } from '../config';
 import { isUniqueViolation, prisma } from '../db';
 import { ApiError, conflict, notFound } from '../errors';
-import { Me, Nullable, Password, errors } from '../schemas';
+import { Me, Nullable, Password, SessionResponse, errors } from '../schemas';
 import type { Provider } from '../services/social';
 import { toMe } from '../services/users';
 
@@ -55,21 +56,24 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
       schema: {
         tags: ['profile'],
         summary: 'Change (or create, for social accounts) my password',
+        description:
+          'Revokes every open session of the account (a stolen one included) and returns a new session for this device.',
         body: Type.Object({ currentPassword: Type.Optional(Type.String({ maxLength: 128 })), newPassword: Password }),
-        response: { 204: Type.Null(), ...errors(400, 403) },
+        response: { 200: SessionResponse, ...errors(400, 403) },
       },
     },
-    async (req, reply) => {
+    async (req) => {
       const user = await me(req.userId);
       if (user.passwordHash) {
         const ok = await bcrypt.compare(req.body.currentPassword ?? '', user.passwordHash);
         if (!ok) throw new ApiError(403, 'INVALID_PASSWORD', 'Current password is incorrect');
       }
-      await prisma.user.update({
+      const updated = await prisma.user.update({
         where: { id: user.id },
         data: { passwordHash: await bcrypt.hash(req.body.newPassword, config.bcryptRounds) },
       });
-      return reply.code(204).send(null);
+      await revokeAllSessions(user.id);
+      return { ...(await issueSession(user.id)), user: toMe(updated) };
     },
   );
 

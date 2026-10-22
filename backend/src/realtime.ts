@@ -1,19 +1,12 @@
 import type { Server as HttpServer } from 'node:http';
 import { Server } from 'socket.io';
-import { verifyAccessToken } from './auth/tokens';
+import { verifyAccess } from './auth/tokens';
 import { canAccessRoom } from './services/access';
 
-/**
- * Real-time channel (Socket.IO / WebSocket). It is push-only: every state change goes
- * through the REST API, which then broadcasts the new state to the subscribed clients.
- * Subscribing to a room requires the same read permission as the matching GET route.
- *
- * Client -> server: "subscribe" / "unsubscribe" with a room name: event:<id>,
- *   playlist:<id> or device:<id>. The ack is { ok: boolean }.
- * Server -> client: "event:state", "playlist:state", "device:state", "<kind>:deleted".
- */
+/** Push-only real-time channel: writes go through REST (protocol in docs/ARCHITECTURE.md). */
 export class Realtime {
   readonly io: Server;
+  private snapshots = new Map<string, { event: string; load: (id: string) => Promise<unknown> }>();
 
   constructor(server: HttpServer, corsOrigins: string[]) {
     this.io = new Server(server, { cors: { origin: corsOrigins.length ? corsOrigins : false } });
@@ -21,7 +14,9 @@ export class Realtime {
     this.io.use((socket, next) => {
       try {
         const token = socket.handshake.auth?.token;
-        socket.data.userId = verifyAccessToken(typeof token === 'string' ? token : '');
+        const { userId, expiresAt } = verifyAccess(typeof token === 'string' ? token : '');
+        socket.data.userId = userId;
+        socket.data.expiresAt = expiresAt;
         next();
       } catch {
         next(new Error('UNAUTHORIZED'));
@@ -32,9 +27,20 @@ export class Realtime {
       const userId: string = socket.data.userId;
       socket.join(`user:${userId}`);
 
+      // A socket lives as long as its access token: a fresh one re-checks the session on reconnect.
+      const expiry = setTimeout(() => socket.disconnect(true), socket.data.expiresAt - Date.now());
+      socket.on('disconnect', () => clearTimeout(expiry));
+
       socket.on('subscribe', async (room: unknown, ack?: (r: { ok: boolean }) => void) => {
         const ok = typeof room === 'string' && room.length < 100 && (await canAccessRoom(userId, room).catch(() => false));
-        if (ok) socket.join(room as string);
+        if (ok) {
+          socket.join(room as string);
+          // Pushes sent while the socket was out of the room are lost: send the current state once.
+          const [kind, id] = (room as string).split(':');
+          const snapshot = this.snapshots.get(kind);
+          const state = await snapshot?.load(id).catch(() => null);
+          if (snapshot && state) socket.emit(snapshot.event, state);
+        }
         if (typeof ack === 'function') ack({ ok });
       });
 
@@ -46,15 +52,16 @@ export class Realtime {
 
   private pending = new Map<string, NodeJS.Timeout>();
 
+  /** Loads the state of a room kind ("event", "playlist", "device"), sent to each new subscriber. */
+  onSubscribe(kind: string, event: string, load: (id: string) => Promise<unknown>): void {
+    this.snapshots.set(kind, { event, load });
+  }
+
   emit(room: string, event: string, payload: unknown): void {
     this.io.to(room).emit(event, payload);
   }
 
-  /**
-   * Coalesced broadcast: during a burst (hundreds of votes per second on one event), the
-   * state is loaded and pushed at most once per window instead of once per write. The
-   * subscribers always end up with the latest state, carried with its version number.
-   */
+  /** Coalesced broadcast: at most one load and push per room per window, always the latest state. */
   schedule(room: string, event: string, load: () => Promise<unknown>, windowMs = 100): void {
     if (this.pending.has(room)) return;
     const timer = setTimeout(async () => {
@@ -73,12 +80,12 @@ export class Realtime {
     this.pending.clear();
   }
 
-  /** Re-checks every subscriber of a room after a permission change and evicts the ones who lost access. */
+  /** Evicts subscribers who lost access; a failed check evicts only that one, not the whole push. */
   async revalidate(room: string): Promise<void> {
     const sockets = await this.io.in(room).fetchSockets();
     await Promise.all(
       sockets.map(async (s) => {
-        if (!(await canAccessRoom(s.data.userId, room))) s.leave(room);
+        if (!(await canAccessRoom(s.data.userId, room).catch(() => false))) s.leave(room);
       }),
     );
   }

@@ -23,15 +23,20 @@ export function signAccessToken(userId: string): string {
   });
 }
 
-/** Returns the user id, or throws 401. The algorithm is pinned to refuse "alg: none" tokens. */
-export function verifyAccessToken(token: string): string {
+/** Returns the user id and expiry (ms), or throws 401; HS256 is pinned to refuse "alg: none". */
+export function verifyAccess(token: string): { userId: string; expiresAt: number } {
   try {
     const payload = jwt.verify(token, config.jwtSecret, { algorithms: ['HS256'], issuer: ISSUER });
-    if (typeof payload === 'string' || payload.typ !== 'access' || !payload.sub) throw new Error();
-    return payload.sub;
+    if (typeof payload === 'string' || payload.typ !== 'access' || !payload.sub || !payload.exp) throw new Error();
+    return { userId: payload.sub, expiresAt: payload.exp * 1000 };
   } catch {
     throw unauthorized('INVALID_TOKEN', 'Invalid or expired access token');
   }
+}
+
+/** Returns the user id, or throws 401. */
+export function verifyAccessToken(token: string): string {
+  return verifyAccess(token).userId;
 }
 
 export interface Session {
@@ -53,11 +58,7 @@ export async function issueSession(userId: string, familyId: string = randomUUID
   return { accessToken: signAccessToken(userId), refreshToken, expiresIn: config.accessTokenTtlSec };
 }
 
-/**
- * Refresh token rotation: each refresh token can be used exactly once. Presenting an
- * already used token means it was copied (session theft): the whole family is revoked,
- * which disconnects both the thief and the victim, who simply logs in again.
- */
+/** Single-use refresh tokens: a reused one means theft, so the whole family is revoked. */
 export async function rotateSession(refreshToken: string): Promise<{ userId: string; session: Session }> {
   const now = new Date();
   const stored = await prisma.refreshToken.findUnique({ where: { tokenHash: sha256(refreshToken) } });

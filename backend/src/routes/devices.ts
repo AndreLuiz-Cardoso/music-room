@@ -2,17 +2,11 @@ import { Type, type FastifyPluginAsyncTypebox, type Static } from '@fastify/type
 import type { Device, Prisma } from '@prisma/client';
 import { lockRow, prisma, transaction } from '../db';
 import { badRequest, forbidden, notFound } from '../errors';
-import { canControlDevice, canSeePlaylist } from '../domain/policies';
+import { canControlDevice, canSee } from '../domain/policies';
 import { applyCommand, initialPlayback, parsePlayback, type PlaybackCommand, type PlaybackTrack } from '../domain/playback';
 import { DateTimeInput, DeviceDetail, DeviceState, Id, IdParams, Nullable, errors } from '../schemas';
-import type { Track } from '../services/catalog';
+import { previewAddress, type Track } from '../services/catalog';
 import { areFriends, userSummarySelect } from '../services/users';
-
-// Music Control Delegation. Each device attached to an account has its own "license": the
-// list of friends allowed to control it, each with an optional expiry date. The playback
-// state lives on the server; owner and delegates send commands, the server applies them
-// under the device row lock (two simultaneous "next" give two skips, never a lost update)
-// and broadcasts the new state, which the device then plays.
 
 const DelegationParams = Type.Object({ id: Id, userId: Id });
 
@@ -47,19 +41,16 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
   app.addHook('onRequest', app.authenticate);
 
   const include = { owner: { select: userSummarySelect } } as const;
-  type DeviceWithOwner = Device & { owner: { id: string; displayName: string; avatarUrl: string | null; musicPreferences: string[] } };
+  type DeviceWithOwner = Device & { owner: { id: string; displayName: string; avatarUrl: string | null } };
 
   function toState(d: DeviceWithOwner) {
+    const playback = parsePlayback(d.playback);
     return {
       id: d.id,
       name: d.name,
       owner: d.owner,
-      platform: d.platform,
-      model: d.model,
-      appVersion: d.appVersion,
-      playback: parsePlayback(d.playback),
+      playback: { ...playback, queue: playback.queue.map((t) => ({ ...t, previewUrl: previewAddress(t.id, t.previewUrl) })) },
       version: d.version,
-      lastSeenAt: d.lastSeenAt,
     };
   }
 
@@ -95,14 +86,22 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
     return device;
   }
 
+  const loadState = async (deviceId: string) => toState(await prisma.device.findUniqueOrThrow({ where: { id: deviceId }, include }));
+
   function broadcast(deviceId: string) {
+    const room = `device:${deviceId}`;
     app.realtime.schedule(
-      `device:${deviceId}`,
+      room,
       'device:state',
-      async () => toState(await prisma.device.findUniqueOrThrow({ where: { id: deviceId }, include })),
+      async () => {
+        // Delegations also end without a request (expiry, unfriending): re-check before each push.
+        await app.realtime.revalidate(room);
+        return loadState(deviceId);
+      },
       50,
     );
   }
+  app.realtime.onSubscribe('device', 'device:state', loadState);
 
   app.get(
     '/',
@@ -205,8 +204,6 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
     },
   );
 
-  // ---------- license ----------
-
   app.put(
     '/:id/delegations/:userId',
     {
@@ -255,8 +252,6 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
     },
   );
 
-  // ---------- remote control ----------
-
   async function resolveCommand(body: Static<typeof CommandBody>, userId: string): Promise<PlaybackCommand> {
     switch (body.action) {
       case 'SET_VOLUME':
@@ -268,14 +263,14 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
         return { action: 'LOAD', queue: [toPlaybackTrack(track)], index: 0 };
       }
       case 'PLAY_PLAYLIST': {
-        // The controller must be able to read the playlist: a delegation does not grant access to private playlists.
+        // A delegation does not grant access to the owner's private playlists.
         const playlist = body.playlistId
           ? await prisma.playlist.findUnique({
               where: { id: body.playlistId },
               include: { tracks: { orderBy: { position: 'asc' } }, invites: { where: { userId }, select: { userId: true } } },
             })
           : null;
-        if (!playlist || !canSeePlaylist(playlist, { userId, invited: playlist.invites.length > 0 })) throw notFound('playlist');
+        if (!playlist || !canSee(playlist, { userId, invited: playlist.invites.length > 0 })) throw notFound('playlist');
         return {
           action: 'LOAD',
           queue: playlist.tracks.map((t) => toPlaybackTrack({ ...t, id: t.trackId })),

@@ -15,9 +15,17 @@ function list(value: string | undefined): string[] {
     .filter(Boolean);
 }
 
+/** TRUST_PROXY: "true" or the proxy addresses. Off by default, or clients could forge their IP. */
+function trustProxy(value: string | undefined): boolean | string {
+  if (!value || value === 'false') return false;
+  return value === 'true' ? true : value;
+}
+
 const port = Number(process.env.PORT ?? 3000);
 const jwtSecret = required('JWT_SECRET');
 if (jwtSecret.length < 32) throw new Error('JWT_SECRET must be at least 32 characters long');
+// the value of .env.example is public: anyone could sign tokens with it
+if (jwtSecret.includes('change-me')) throw new Error('JWT_SECRET is still the example of .env.example: generate one (see .env.example)');
 
 export const config = {
   env: process.env.NODE_ENV ?? 'development',
@@ -30,6 +38,7 @@ export const config = {
   refreshTokenTtlDays: 30,
   bcryptRounds: Number(process.env.BCRYPT_ROUNDS ?? 12),
   corsOrigins: list(process.env.CORS_ORIGINS),
+  trustProxy: trustProxy(process.env.TRUST_PROXY),
   rateLimit: {
     global: Number(process.env.RATE_LIMIT_MAX ?? 300),
     auth: Number(process.env.AUTH_RATE_LIMIT_MAX ?? 10),

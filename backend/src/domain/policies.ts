@@ -1,5 +1,4 @@
-// Pure access rules for the three services. No I/O here: the routes load the facts
-// (ownership, invitation, friendship...) and these functions decide.
+// Pure access rules, no I/O: the routes load the facts (ownership, invites...), these decide.
 
 export type Visibility = 'PUBLIC' | 'PRIVATE';
 export type EventLicense = 'EVERYONE' | 'INVITED_ONLY' | 'LOCATION_TIME';
@@ -49,22 +48,30 @@ export function distanceMeters(a: GeoPoint, b: GeoPoint): number {
   return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(h));
 }
 
-/** Public events are visible to everybody, private ones only to the owner and the invited users. */
-export function canSeeEvent(event: Pick<EventRules, 'ownerId' | 'visibility'>, m: Membership): boolean {
-  return event.visibility === 'PUBLIC' || event.ownerId === m.userId || m.invited;
+/** Public: everybody; private: owner and invited users. `visibleWhere`: same rule in SQL. */
+export function canSee(resource: { ownerId: string; visibility: Visibility }, m: Membership): boolean {
+  return resource.visibility === 'PUBLIC' || resource.ownerId === m.userId || m.invited;
 }
 
-/**
- * Who may suggest or vote. Called with `location === undefined` to compute a preview
- * (e.g. to grey out the vote buttons): the area check is then skipped.
- */
+export type ListFilter = 'all' | 'mine' | 'invited';
+
+/** Prisma `where` of a user's lists: the `canSee` rule, narrowed by `filter` and a name search. */
+export function visibleWhere(userId: string, filter: ListFilter, name?: string) {
+  const invited = { invites: { some: { userId } } };
+  const search = name ? { name: { contains: name, mode: 'insensitive' as const } } : {};
+  if (filter === 'mine') return { ownerId: userId, ...search };
+  if (filter === 'invited') return { ...invited, ...search };
+  return { OR: [{ visibility: 'PUBLIC' as const }, { ownerId: userId }, invited], ...search };
+}
+
+/** Who may suggest or vote; `location === undefined` gives a preview (area check skipped). */
 export function voteDecision(
   event: EventRules,
   m: Membership,
   now: Date,
   location?: GeoPoint | null,
 ): Decision<VoteDenial> {
-  if (!canSeeEvent(event, m)) return deny('NOT_INVITED');
+  if (!canSee(event, m)) return deny('NOT_INVITED');
   if (event.ownerId === m.userId) return allow;
   switch (event.license) {
     case 'EVERYONE':
@@ -89,12 +96,8 @@ export interface PlaylistRules {
   license: PlaylistLicense;
 }
 
-export function canSeePlaylist(p: Pick<PlaylistRules, 'ownerId' | 'visibility'>, m: Membership): boolean {
-  return p.visibility === 'PUBLIC' || p.ownerId === m.userId || m.invited;
-}
-
 export function canEditPlaylist(p: PlaylistRules, m: Membership): boolean {
-  if (!canSeePlaylist(p, m)) return false;
+  if (!canSee(p, m)) return false;
   if (p.ownerId === m.userId) return true;
   return p.license === 'EVERYONE' || m.invited;
 }
@@ -103,7 +106,7 @@ export interface DelegationGrant {
   expiresAt: Date | null;
 }
 
-/** A device is controlled by its owner, or by a friend holding a non-expired delegation for this device. */
+/** The owner, or a friend holding a non-expired delegation for this device. */
 export function canControlDevice(
   device: { ownerId: string },
   userId: string,

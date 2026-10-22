@@ -1,7 +1,24 @@
 import type { User } from '@prisma/client';
 import { prisma, type Tx } from '../db';
+import { notFound } from '../errors';
 
-export const userSummarySelect = { id: true, displayName: true, avatarUrl: true, musicPreferences: true } as const;
+export const userSummarySelect = { id: true, displayName: true, avatarUrl: true } as const;
+
+/** Search results and friend lists also show the music taste. */
+export const userCardSelect = { ...userSummarySelect, musicPreferences: true } as const;
+
+/** Prisma options listing the invited users of an event or a playlist, oldest invitation first. */
+export const invitees = { include: { user: { select: userSummarySelect } }, orderBy: { createdAt: 'asc' } } as const;
+
+/** Emails are stored in lower case: every account created and every lookup goes through here. */
+export const normalizeEmail = (email: string) => email.toLowerCase();
+
+export const findUserByEmail = (email: string) => prisma.user.findUnique({ where: { email: normalizeEmail(email) } });
+
+/** 404 when the user does not exist (befriended, invited...). */
+export async function ensureUser(userId: string, db: Tx | typeof prisma = prisma): Promise<void> {
+  if (!(await db.user.findUnique({ where: { id: userId }, select: { id: true } }))) throw notFound('user');
+}
 
 export function toMe(u: User) {
   return {

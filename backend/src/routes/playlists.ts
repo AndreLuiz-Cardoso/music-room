@@ -2,26 +2,16 @@ import { Type, type FastifyPluginAsyncTypebox } from '@fastify/type-provider-typ
 import type { Playlist, PlaylistTrack as PlaylistTrackRow, Prisma } from '@prisma/client';
 import { isUniqueViolation, lockRow, prisma, transaction } from '../db';
 import { ApiError, badRequest, conflict, forbidden, notFound } from '../errors';
-import { canEditPlaylist, canSeePlaylist } from '../domain/policies';
+import { canEditPlaylist, canSee, visibleWhere } from '../domain/policies';
 import { insertionIndex, moveAfter } from '../domain/ordering';
-import { Id, IdParams, Nullable, PlaylistDetail, PlaylistLicense, PlaylistSummary, UserSummary, Visibility, errors } from '../schemas';
-import { userSummarySelect } from '../services/users';
-
-// Music Playlist Editor. Concurrency strategy:
-//  - every edit locks the playlist row (SELECT ... FOR UPDATE), so edits are applied one after
-//    the other and positions always stay a dense 0..n-1 sequence;
-//  - moves and inserts are relative to an anchor entry ("after entry X") rather than to an index
-//    the client computed on a possibly stale copy, so concurrent moves of different tracks
-//    both apply as intended; concurrent moves of the same track: the last one applied wins;
-//  - if the anchor was deleted in the meantime, the operation is refused with 409 and the
-//    client receives the fresh state to retry on;
-//  - a track appears at most once per playlist (unique constraint): two users adding it at the
-//    same time give one entry and one 409.
+import { Id, IdParams, ListQuery, Nullable, PlaylistDetail, PlaylistLicense, PlaylistSummary, UserSummary, Visibility, errors } from '../schemas';
+import { fromStoredTrack, toStoredTrack } from '../services/catalog';
+import { ensureUser, invitees, userSummarySelect } from '../services/users';
 
 const EntryParams = Type.Object({ id: Id, entryId: Id });
 const InviteParams = Type.Object({ id: Id, userId: Id });
 
-type PlaylistWithOwner = Playlist & { owner: { id: string; displayName: string; avatarUrl: string | null; musicPreferences: string[] } };
+type PlaylistWithOwner = Playlist & { owner: { id: string; displayName: string; avatarUrl: string | null } };
 
 function common(p: PlaylistWithOwner) {
   return {
@@ -40,14 +30,7 @@ function toEntry(t: PlaylistTrackRow) {
   return {
     id: t.id,
     position: t.position,
-    trackId: t.trackId,
-    title: t.title,
-    artist: t.artist,
-    album: t.album,
-    coverUrl: t.coverUrl,
-    previewUrl: t.previewUrl,
-    durationSec: t.durationSec,
-    addedById: t.addedById,
+    ...fromStoredTrack(t),
   };
 }
 
@@ -70,7 +53,7 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
   async function detail(playlistId: string, userId: string) {
     const { playlist, state } = await loadState(playlistId);
     const membership = { userId, invited: await isInvited(playlistId, userId) };
-    if (!canSeePlaylist(playlist, membership)) throw notFound('playlist');
+    if (!canSee(playlist, membership)) throw notFound('playlist');
     return {
       ...state,
       isOwner: playlist.ownerId === userId,
@@ -82,6 +65,7 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
   function broadcast(playlistId: string) {
     app.realtime.schedule(`playlist:${playlistId}`, 'playlist:state', async () => (await loadState(playlistId)).state);
   }
+  app.realtime.onSubscribe('playlist', 'playlist:state', async (id) => (await loadState(id)).state);
 
   type Need = 'edit' | 'owner';
 
@@ -96,7 +80,7 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
       await lockRow(tx, 'Playlist', playlistId);
       const playlist = await tx.playlist.findUniqueOrThrow({ where: { id: playlistId } });
       const membership = { userId, invited: await isInvited(playlistId, userId, tx) };
-      if (!canSeePlaylist(playlist, membership)) throw notFound('playlist');
+      if (!canSee(playlist, membership)) throw notFound('playlist');
       if (need === 'owner' && playlist.ownerId !== userId) throw forbidden('NOT_OWNER', 'Only the owner can do this');
       if (need === 'edit' && !canEditPlaylist(playlist, membership)) {
         throw forbidden('NOT_EDITOR', 'Only invited users can edit this playlist');
@@ -123,34 +107,20 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
     throw conflict('ANCHOR_NOT_FOUND', 'The playlist changed: the reference track was removed');
   }
 
-  // ---------- CRUD ----------
-
   app.get(
     '/',
     {
       schema: {
         tags: ['playlists'],
         summary: 'Playlists I can see',
-        querystring: Type.Object({
-          filter: Type.Optional(Type.Union([Type.Literal('all'), Type.Literal('mine'), Type.Literal('invited')], { default: 'all' })),
-          q: Type.Optional(Type.String({ maxLength: 100 })),
-        }),
+        querystring: ListQuery,
         response: { 200: Type.Array(PlaylistSummary) },
       },
     },
     async (req) => {
       const me = req.userId;
-      const { filter = 'all', q } = req.query;
-      const where: Prisma.PlaylistWhereInput = {
-        ...(filter === 'mine'
-          ? { ownerId: me }
-          : filter === 'invited'
-            ? { invites: { some: { userId: me } } }
-            : { OR: [{ visibility: 'PUBLIC' }, { ownerId: me }, { invites: { some: { userId: me } } }] }),
-        ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}),
-      };
       const playlists = await prisma.playlist.findMany({
-        where,
+        where: visibleWhere(me, req.query.filter ?? 'all', req.query.q),
         include: {
           owner: { select: userSummarySelect },
           invites: { where: { userId: me }, select: { userId: true } },
@@ -242,7 +212,7 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
       const playlist = await prisma.playlist.findUnique({ where: { id: req.params.id } });
       if (!playlist) throw notFound('playlist');
       if (playlist.ownerId !== req.userId) {
-        const visible = canSeePlaylist(playlist, { userId: req.userId, invited: await isInvited(playlist.id, req.userId) });
+        const visible = canSee(playlist, { userId: req.userId, invited: await isInvited(playlist.id, req.userId) });
         throw visible ? forbidden('NOT_OWNER', 'Only the owner can do this') : notFound('playlist');
       }
       await prisma.playlist.delete({ where: { id: playlist.id } });
@@ -251,18 +221,13 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
     },
   );
 
-  // ---------- invitations ----------
-
   app.get(
     '/:id/invites',
-    { schema: { tags: ['playlists'], summary: 'Invited users', params: IdParams, response: { 200: Type.Array(UserSummary), ...errors(404) } } },
+    { schema: { tags: ['playlists'], summary: 'Invited users (owner)', params: IdParams, response: { 200: Type.Array(UserSummary), ...errors(403, 404) } } },
     async (req) => {
-      await detail(req.params.id, req.userId);
-      const invites = await prisma.playlistInvite.findMany({
-        where: { playlistId: req.params.id },
-        include: { user: { select: userSummarySelect } },
-        orderBy: { createdAt: 'asc' },
-      });
+      const { isOwner } = await detail(req.params.id, req.userId); // 404 when the playlist is not visible
+      if (!isOwner) throw forbidden('NOT_OWNER', 'Only the owner can do this');
+      const invites = await prisma.playlistInvite.findMany({ where: { playlistId: req.params.id }, ...invitees });
       return invites.map((i) => i.user);
     },
   );
@@ -280,7 +245,7 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
     },
     async (req) =>
       write(req.params.id, req.userId, 'owner', async (tx) => {
-        if (!(await tx.user.findUnique({ where: { id: req.body.userId }, select: { id: true } }))) throw notFound('user');
+        await ensureUser(req.body.userId, tx);
         await tx.playlistInvite.upsert({
           where: { playlistId_userId: { playlistId: req.params.id, userId: req.body.userId } },
           create: { playlistId: req.params.id, userId: req.body.userId },
@@ -302,8 +267,6 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
       return result;
     },
   );
-
-  // ---------- tracks ----------
 
   app.post(
     '/:id/tracks',
@@ -336,18 +299,7 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
             data: { position: { increment: 1 } },
           });
           await tx.playlistTrack.create({
-            data: {
-              playlistId: playlist.id,
-              position: index,
-              trackId: track.id,
-              title: track.title,
-              artist: track.artist,
-              album: track.album,
-              coverUrl: track.coverUrl,
-              previewUrl: track.previewUrl,
-              durationSec: track.durationSec,
-              addedById: req.userId,
-            },
+            data: { playlistId: playlist.id, position: index, ...toStoredTrack(track), addedById: req.userId },
           });
         });
       } catch (err) {

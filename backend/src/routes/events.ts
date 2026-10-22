@@ -2,7 +2,7 @@ import { Type, type FastifyPluginAsyncTypebox } from '@fastify/type-provider-typ
 import { Prisma, type Event, type EventTrack as EventTrackRow } from '@prisma/client';
 import { lockRow, prisma, transaction } from '../db';
 import { ApiError, badRequest, forbidden, notFound } from '../errors';
-import { canSeeEvent, voteDecision, type GeoPoint } from '../domain/policies';
+import { canSee, visibleWhere, voteDecision, type GeoPoint } from '../domain/policies';
 import {
   DateTimeInput,
   EventDetail,
@@ -10,23 +10,14 @@ import {
   EventSummary,
   Id,
   IdParams,
+  ListQuery,
   Nullable,
   UserSummary,
   Visibility,
   errors,
 } from '../schemas';
-import { userSummarySelect } from '../services/users';
-
-// Music Track Vote. Concurrency strategy:
-//  - a vote is a row with primary key (entry, user): voting twice is a no-op, never a double count;
-//  - every write (vote, suggestion, next, settings) runs in a transaction that first locks the
-//    event row, so the queue is changed by one writer at a time, a track cannot be queued twice
-//    and "next" sees a stable queue. Locks are always taken in the same order (event, then
-//    tracks), which rules out deadlocks;
-//  - permission checks run before the transaction, and a vote is a single SQL statement, so the
-//    lock is held for two short statements only (the vote is the hot path);
-//  - after the commit the new state is broadcast to every subscriber with its version (coalesced
-//    during bursts), so that clients can ignore messages older than what they already display.
+import { fromStoredTrack, toStoredTrack } from '../services/catalog';
+import { ensureUser, invitees, userSummarySelect } from '../services/users';
 
 const LocationBody = Type.Object({
   latitude: Type.Number({ minimum: -90, maximum: 90 }),
@@ -52,7 +43,7 @@ const VoteBody = Type.Object({
 const EntryParams = Type.Object({ id: Id, entryId: Id });
 const InviteParams = Type.Object({ id: Id, userId: Id });
 
-type EventWithOwner = Event & { owner: { id: string; displayName: string; avatarUrl: string | null; musicPreferences: string[] } };
+type EventWithOwner = Event & { owner: { id: string; displayName: string; avatarUrl: string | null } };
 
 function common(e: EventWithOwner) {
   return {
@@ -62,28 +53,23 @@ function common(e: EventWithOwner) {
     owner: e.owner,
     visibility: e.visibility,
     license: e.license,
-    location:
-      e.latitude !== null && e.longitude !== null && e.radiusMeters !== null
-        ? { latitude: e.latitude, longitude: e.longitude, radiusMeters: e.radiusMeters }
-        : null,
     voteWindow: e.voteStartsAt && e.voteEndsAt ? { startsAt: e.voteStartsAt, endsAt: e.voteEndsAt } : null,
     createdAt: e.createdAt,
   };
 }
 
+/** Voters see the size of the vote area (the server does the geofencing); only the owner, who edits it, gets its center. */
+function location(e: Event, isOwner: boolean) {
+  if (e.latitude === null || e.longitude === null || e.radiusMeters === null) return null;
+  return isOwner ? { latitude: e.latitude, longitude: e.longitude, radiusMeters: e.radiusMeters } : { radiusMeters: e.radiusMeters };
+}
+
 function toTrack(t: EventTrackRow) {
   return {
     id: t.id,
-    trackId: t.trackId,
-    title: t.title,
-    artist: t.artist,
-    album: t.album,
-    coverUrl: t.coverUrl,
-    previewUrl: t.previewUrl,
-    durationSec: t.durationSec,
+    ...fromStoredTrack(t),
     score: t.score,
     status: t.status,
-    suggestedById: t.suggestedById,
     createdAt: t.createdAt,
   };
 }
@@ -106,6 +92,7 @@ async function loadState(eventId: string) {
     event,
     state: {
       ...common(event),
+      location: location(event, false),
       version: event.version,
       nowPlaying: playing ? toTrack(playing) : null,
       queue: event.tracks.filter((t) => t.status === 'QUEUED').map(toTrack),
@@ -155,7 +142,7 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
     const { event, state } = await loadState(eventId);
     const invited = await isInvited(eventId, userId);
     const membership = { userId, invited };
-    if (!canSeeEvent(event, membership)) throw notFound('event');
+    if (!canSee(event, membership)) throw notFound('event');
     const decision = voteDecision(event, membership, new Date());
     const ids = [...state.queue.map((t) => t.id), ...(state.nowPlaying ? [state.nowPlaying.id] : [])];
     const votes = ids.length
@@ -163,6 +150,7 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
       : [];
     return {
       ...state,
+      location: location(event, event.ownerId === userId),
       isOwner: event.ownerId === userId,
       isInvited: invited,
       myVotes: votes.map((v) => v.eventTrackId),
@@ -175,14 +163,9 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
   function broadcast(eventId: string) {
     app.realtime.schedule(`event:${eventId}`, 'event:state', async () => (await loadState(eventId)).state);
   }
+  app.realtime.onSubscribe('event', 'event:state', async (id) => (await loadState(id)).state);
 
-  /**
-   * Runs a voter's write on the event queue, then broadcasts and returns the caller's view.
-   * The permission check is done before the transaction, so that the event lock is held as
-   * briefly as possible. Inside the transaction the very first statement bumps the version,
-   * which locks the event row: every writer locks the event first, then the tracks, so two
-   * transactions can never wait on each other in a cycle (no deadlock).
-   */
+  /** A voter's write: checks first, then locks the event before tracks (short lock, no deadlock). */
   async function voteWrite(
     eventId: string,
     userId: string,
@@ -191,7 +174,7 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
   ) {
     const event = await prisma.event.findUnique({ where: { id: eventId } });
     const membership = { userId, invited: event ? await isInvited(eventId, userId) : false };
-    if (!event || !canSeeEvent(event, membership)) throw notFound('event');
+    if (!event || !canSee(event, membership)) throw notFound('event');
     if (check.license) {
       const decision = voteDecision(event, membership, new Date(), check.location);
       if (!decision.allowed) throw forbidden(decision.reason, 'You are not allowed to vote in this event');
@@ -205,11 +188,7 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
     return detail(eventId, userId);
   }
 
-  /**
-   * Adds (+1) or removes (-1) the user's vote in one statement. The vote row primary key makes
-   * it idempotent, and the score moves only when a row was really inserted / deleted.
-   * Returns false when the entry is not in the queue anymore.
-   */
+  /** ±1 vote in one idempotent statement; false when the entry is not in the queue anymore. */
   async function applyVote(tx: Prisma.TransactionClient, eventId: string, entryId: string, userId: string, delta: 1 | -1) {
     const change =
       delta === 1
@@ -230,7 +209,7 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
       await lockRow(tx, 'Event', eventId);
       const event = await tx.event.findUniqueOrThrow({ where: { id: eventId } });
       if (event.ownerId !== userId) {
-        const visible = canSeeEvent(event, { userId, invited: await isInvited(eventId, userId, tx) });
+        const visible = canSee(event, { userId, invited: await isInvited(eventId, userId, tx) });
         throw visible ? forbidden('NOT_OWNER', 'Only the owner can do this') : notFound('event');
       }
       await mutate(tx, event);
@@ -243,36 +222,20 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
   const locationOf = (b: { latitude?: number; longitude?: number } | undefined): GeoPoint | null =>
     b && b.latitude !== undefined && b.longitude !== undefined ? { latitude: b.latitude, longitude: b.longitude } : null;
 
-  // ---------- CRUD ----------
-
   app.get(
     '/',
     {
       schema: {
         tags: ['events'],
         summary: 'Events I can see',
-        querystring: Type.Object({
-          filter: Type.Optional(
-            Type.Union([Type.Literal('all'), Type.Literal('mine'), Type.Literal('invited')], { default: 'all' }),
-          ),
-          q: Type.Optional(Type.String({ maxLength: 100 })),
-        }),
+        querystring: ListQuery,
         response: { 200: Type.Array(EventSummary) },
       },
     },
     async (req) => {
       const me = req.userId;
-      const { filter = 'all', q } = req.query;
-      const where: Prisma.EventWhereInput = {
-        ...(filter === 'mine'
-          ? { ownerId: me }
-          : filter === 'invited'
-            ? { invites: { some: { userId: me } } }
-            : { OR: [{ visibility: 'PUBLIC' }, { ownerId: me }, { invites: { some: { userId: me } } }] }),
-        ...(q ? { name: { contains: q, mode: 'insensitive' } } : {}),
-      };
       const events = await prisma.event.findMany({
-        where,
+        where: visibleWhere(me, req.query.filter ?? 'all', req.query.q),
         include: { owner: { select: userSummarySelect }, invites: { where: { userId: me }, select: { userId: true } } },
         orderBy: { createdAt: 'desc' },
         take: 100,
@@ -385,7 +348,7 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
       const event = await prisma.event.findUnique({ where: { id: req.params.id } });
       if (!event) throw notFound('event');
       if (event.ownerId !== req.userId) {
-        const visible = canSeeEvent(event, { userId: req.userId, invited: await isInvited(event.id, req.userId) });
+        const visible = canSee(event, { userId: req.userId, invited: await isInvited(event.id, req.userId) });
         throw visible ? forbidden('NOT_OWNER', 'Only the owner can do this') : notFound('event');
       }
       await prisma.event.delete({ where: { id: event.id } });
@@ -394,18 +357,13 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
     },
   );
 
-  // ---------- invitations ----------
-
   app.get(
     '/:id/invites',
-    { schema: { tags: ['events'], summary: 'Invited users', params: IdParams, response: { 200: Type.Array(UserSummary), ...errors(404) } } },
+    { schema: { tags: ['events'], summary: 'Invited users (owner)', params: IdParams, response: { 200: Type.Array(UserSummary), ...errors(403, 404) } } },
     async (req) => {
-      await detail(req.params.id, req.userId);
-      const invites = await prisma.eventInvite.findMany({
-        where: { eventId: req.params.id },
-        include: { user: { select: userSummarySelect } },
-        orderBy: { createdAt: 'asc' },
-      });
+      const { isOwner } = await detail(req.params.id, req.userId); // 404 when the event is not visible
+      if (!isOwner) throw forbidden('NOT_OWNER', 'Only the owner can do this');
+      const invites = await prisma.eventInvite.findMany({ where: { eventId: req.params.id }, ...invitees });
       return invites.map((i) => i.user);
     },
   );
@@ -423,7 +381,7 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
     },
     async (req) =>
       ownerWrite(req.params.id, req.userId, async (tx) => {
-        if (!(await tx.user.findUnique({ where: { id: req.body.userId }, select: { id: true } }))) throw notFound('user');
+        await ensureUser(req.body.userId, tx);
         await tx.eventInvite.upsert({
           where: { eventId_userId: { eventId: req.params.id, userId: req.body.userId } },
           create: { eventId: req.params.id, userId: req.body.userId },
@@ -445,8 +403,6 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
       return result;
     },
   );
-
-  // ---------- queue ----------
 
   app.post(
     '/:id/tracks',
@@ -471,17 +427,7 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
         let entry = await tx.eventTrack.findFirst({ where: { eventId: req.params.id, trackId: track.id, status: 'QUEUED' } });
         if (!entry) {
           entry = await tx.eventTrack.create({
-            data: {
-              eventId: req.params.id,
-              trackId: track.id,
-              title: track.title,
-              artist: track.artist,
-              album: track.album,
-              coverUrl: track.coverUrl,
-              previewUrl: track.previewUrl,
-              durationSec: track.durationSec,
-              suggestedById: userId,
-            },
+            data: { eventId: req.params.id, ...toStoredTrack(track), suggestedById: userId },
           });
         }
         await applyVote(tx, req.params.id, entry.id, userId, 1);

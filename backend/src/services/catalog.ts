@@ -1,6 +1,7 @@
-// Music catalog. Only metadata and 30s previews come from the third party: the vote,
-// playlist and delegation logic is ours. Clients only send track ids; the metadata
-// stored in our database always comes from here, never from the client.
+// Third-party catalog: metadata and previews only; stored metadata never comes from clients.
+
+import { createHmac, timingSafeEqual } from 'node:crypto';
+import { config } from '../config';
 
 export interface Track {
   id: string;
@@ -15,6 +16,49 @@ export interface Track {
 export interface TrackCatalog {
   search(query: string, limit: number): Promise<Track[]>;
   get(id: string): Promise<Track | null>;
+}
+
+/** Signed API address redirecting to a fresh catalog link (those expire); null without preview. */
+export function previewAddress(trackId: string, storedPreviewUrl: string | null): string | null {
+  return storedPreviewUrl ? `/tracks/${encodeURIComponent(trackId)}/preview?sig=${previewSignature(trackId)}` : null;
+}
+
+function previewSignature(trackId: string): string {
+  return createHmac('sha256', config.jwtSecret).update(`preview:${trackId}`).digest('base64url').slice(0, 22);
+}
+
+export function isPreviewSigned(trackId: string, sig: string): boolean {
+  const expected = Buffer.from(previewSignature(trackId));
+  const given = Buffer.from(sig);
+  return given.length === expected.length && timingSafeEqual(given, expected);
+}
+
+/** The columns of a catalog track copied into an event queue or a playlist entry. */
+export interface StoredTrack {
+  trackId: string;
+  title: string;
+  artist: string;
+  album: string | null;
+  coverUrl: string | null;
+  previewUrl: string | null;
+  durationSec: number;
+}
+
+export function toStoredTrack(t: Track): StoredTrack {
+  return {
+    trackId: t.id,
+    title: t.title,
+    artist: t.artist,
+    album: t.album,
+    coverUrl: t.coverUrl,
+    previewUrl: t.previewUrl,
+    durationSec: t.durationSec,
+  };
+}
+
+/** A stored copy as the API shows it: never the stored (expired) link, its preview address. */
+export function fromStoredTrack(t: StoredTrack): StoredTrack {
+  return { ...toStoredTrack({ ...t, id: t.trackId }), previewUrl: previewAddress(t.trackId, t.previewUrl) };
 }
 
 interface DeezerTrack {
@@ -38,8 +82,11 @@ function fromDeezer(t: DeezerTrack): Track {
   };
 }
 
+// A cached track is fetched again after 10 minutes: its preview link (valid 15) still plays.
+const CACHE_TTL_MS = 10 * 60_000;
+
 export class DeezerCatalog implements TrackCatalog {
-  private cache = new Map<string, Track>();
+  private cache = new Map<string, { track: Track; at: number }>();
 
   constructor(private readonly baseUrl = 'https://api.deezer.com') {}
 
@@ -51,7 +98,7 @@ export class DeezerCatalog implements TrackCatalog {
 
   private remember(track: Track): Track {
     if (this.cache.size > 10_000) this.cache.clear();
-    this.cache.set(track.id, track);
+    this.cache.set(track.id, { track, at: Date.now() });
     return track;
   }
 
@@ -62,7 +109,7 @@ export class DeezerCatalog implements TrackCatalog {
 
   async get(id: string): Promise<Track | null> {
     const cached = this.cache.get(id);
-    if (cached) return cached;
+    if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.track;
     const match = /^deezer:(\d{1,20})$/.exec(id);
     if (!match) return null;
     const data = await this.fetchJson(`/track/${match[1]}`);

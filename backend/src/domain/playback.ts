@@ -1,5 +1,4 @@
-// State machine of a remote-controlled device. The server owns this state: devices and
-// delegates only send commands, the device then plays whatever the state says.
+// Device playback state machine: the server owns the state, devices and delegates send commands.
 
 export interface PlaybackTrack {
   id: string;

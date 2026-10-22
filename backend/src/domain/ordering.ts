@@ -1,7 +1,4 @@
-// Ordering helpers for the playlist editor. Moves are expressed relative to an anchor
-// ("put X right after Y", null = top) instead of an absolute index: two users moving
-// different tracks at the same time then both get what they asked for, whatever the
-// order in which the server applies the two operations.
+// Moves are relative to an anchor, so concurrent moves of different tracks both apply as asked.
 
 export interface Positioned {
   id: string;

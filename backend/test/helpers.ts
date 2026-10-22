@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { Writable } from 'node:stream';
 import { buildApp, type App } from '../src/app';
 import { prisma } from '../src/db';
 import { signAccessToken } from '../src/auth/tokens';
@@ -23,6 +24,19 @@ export async function createTestApp(): Promise<TestContext> {
   const app = await buildApp({ mailer, social: new FakeSocial(), logger: false });
   await app.ready();
   return { app, mailer };
+}
+
+/** An app whose log lines are kept, for the tests about what is logged (the others log nothing). */
+export async function createLoggedApp() {
+  let log = '';
+  const logger = new Writable({
+    write(chunk, _encoding, done) {
+      log += chunk.toString();
+      done();
+    },
+  });
+  const app = await buildApp({ mailer: new ConsoleMailer(() => {}), social: new FakeSocial(), logger });
+  return { app, logs: () => log };
 }
 
 export async function resetDb() {

@@ -1,8 +1,8 @@
 import { Type, type FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { prisma } from '../db';
 import { notFound } from '../errors';
-import { IdParams, Profile, UserSummary, errors } from '../schemas';
-import { pairKey, userSummarySelect } from '../services/users';
+import { IdParams, Profile, UserCard, errors } from '../schemas';
+import { pairKey, userCardSelect } from '../services/users';
 
 const routes: FastifyPluginAsyncTypebox = async (app) => {
   app.addHook('onRequest', app.authenticate);
@@ -17,7 +17,7 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
           q: Type.Optional(Type.String({ minLength: 2, maxLength: 50 })),
           genre: Type.Optional(Type.String({ minLength: 1, maxLength: 30 })),
         }),
-        response: { 200: Type.Array(UserSummary) },
+        response: { 200: Type.Array(UserCard) },
       },
     },
     async (req) => {
@@ -29,7 +29,7 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
           ...(q ? { displayName: { contains: q, mode: 'insensitive' } } : {}),
           ...(genre ? { musicPreferences: { has: genre.toLowerCase() } } : {}),
         },
-        select: userSummarySelect,
+        select: userCardSelect,
         orderBy: { displayName: 'asc' },
         take: 20,
       });

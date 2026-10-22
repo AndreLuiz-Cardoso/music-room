@@ -76,8 +76,7 @@ model User {
   delegations          DeviceDelegation[]
 }
 
-// Refresh tokens are stored hashed. A family groups the successive rotations of one
-// login session, so that the reuse of a rotated token revokes the whole session.
+// Stored hashed; a family groups one session's rotations, so reusing a rotated token revokes it.
 model RefreshToken {
   id        String    @id @default(uuid())
   userId    String
@@ -119,8 +118,6 @@ model Friendship {
   @@unique([userAId, userBId])
   @@index([userBId])
 }
-
-// ---------- Music Track Vote ----------
 
 model Event {
   id           String       @id @default(uuid())
@@ -190,8 +187,6 @@ model Vote {
   @@index([userId])
 }
 
-// ---------- Music Playlist Editor ----------
-
 model Playlist {
   id          String          @id @default(uuid())
   name        String
@@ -241,8 +236,6 @@ model PlaylistTrack {
   @@index([playlistId, position])
 }
 
-// ---------- Music Control Delegation ----------
-
 model Device {
   id             String             @id @default(uuid())
   ownerId        String
@@ -275,9 +268,7 @@ model DeviceDelegation {
   @@index([delegateId])
 }
 
-// ---------- Logs ----------
-
-// One row per action performed from a client. No foreign key: logging must never block or fail a request.
+// One row per client action. No foreign key: logging must never block or fail a request.
 model ActionLog {
   id         BigInt   @id @default(autoincrement())
   userId     String?

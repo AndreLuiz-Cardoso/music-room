@@ -3,10 +3,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
 import { prisma } from '../db';
 
-// Every action performed from a client is logged with the platform, device and app
-// version sent by the mobile app in the X-Client-* headers. Logs go to the structured
-// server log immediately and to the ActionLog table in batches, so that logging does
-// not add a database round trip to every request.
+// Logged at once to the server log and in batches to ActionLog: no extra DB round trip per request.
 
 const FLUSH_EVERY_MS = 2000;
 const MAX_BUFFER = 500;

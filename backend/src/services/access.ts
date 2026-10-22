@@ -1,5 +1,5 @@
 import { prisma } from '../db';
-import { canControlDevice, canSeeEvent, canSeePlaylist } from '../domain/policies';
+import { canControlDevice, canSee } from '../domain/policies';
 
 // Database-backed versions of the read rules, used to authorize real-time subscriptions.
 
@@ -8,7 +8,7 @@ export async function canAccessEvent(userId: string, eventId: string): Promise<b
     where: { id: eventId },
     select: { ownerId: true, visibility: true, invites: { where: { userId }, select: { userId: true } } },
   });
-  return !!event && canSeeEvent(event, { userId, invited: event.invites.length > 0 });
+  return !!event && canSee(event, { userId, invited: event.invites.length > 0 });
 }
 
 export async function canAccessPlaylist(userId: string, playlistId: string): Promise<boolean> {
@@ -16,7 +16,7 @@ export async function canAccessPlaylist(userId: string, playlistId: string): Pro
     where: { id: playlistId },
     select: { ownerId: true, visibility: true, invites: { where: { userId }, select: { userId: true } } },
   });
-  return !!playlist && canSeePlaylist(playlist, { userId, invited: playlist.invites.length > 0 });
+  return !!playlist && canSee(playlist, { userId, invited: playlist.invites.length > 0 });
 }
 
 export async function canAccessDevice(userId: string, deviceId: string): Promise<boolean> {

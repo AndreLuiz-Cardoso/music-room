@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   canControlDevice,
   canEditPlaylist,
-  canSeeEvent,
-  canSeePlaylist,
+  canSee,
   distanceMeters,
+  visibleWhere,
   voteDecision,
   type EventRules,
 } from '../src/domain/policies';
@@ -28,13 +28,19 @@ const invited = { userId: 'friend', invited: true };
 
 describe('event visibility', () => {
   it('public events are visible to everyone', () => {
-    expect(canSeeEvent(baseEvent, guest)).toBe(true);
+    expect(canSee(baseEvent, guest)).toBe(true);
   });
   it('private events are visible to the owner and invited users only', () => {
     const e = { ...baseEvent, visibility: 'PRIVATE' as const };
-    expect(canSeeEvent(e, guest)).toBe(false);
-    expect(canSeeEvent(e, invited)).toBe(true);
-    expect(canSeeEvent(e, { userId: 'owner', invited: false })).toBe(true);
+    expect(canSee(e, guest)).toBe(false);
+    expect(canSee(e, invited)).toBe(true);
+    expect(canSee(e, { userId: 'owner', invited: false })).toBe(true);
+  });
+  it('the lists filter the database with the same rule, narrowed by the filter and the name', () => {
+    const invitedMe = { invites: { some: { userId: 'me' } } };
+    expect(visibleWhere('me', 'all')).toEqual({ OR: [{ visibility: 'PUBLIC' }, { ownerId: 'me' }, invitedMe] });
+    expect(visibleWhere('me', 'mine', 'rock')).toEqual({ ownerId: 'me', name: { contains: 'rock', mode: 'insensitive' } });
+    expect(visibleWhere('me', 'invited')).toEqual(invitedMe);
   });
 });
 
@@ -89,19 +95,19 @@ describe('event vote license', () => {
 describe('playlist rules', () => {
   const p = { ownerId: 'owner', visibility: 'PUBLIC' as const, license: 'EVERYONE' as const };
   it('public + EVERYONE: everyone can see and edit', () => {
-    expect(canSeePlaylist(p, guest)).toBe(true);
+    expect(canSee(p, guest)).toBe(true);
     expect(canEditPlaylist(p, guest)).toBe(true);
   });
   it('INVITED_ONLY: only invited users and the owner edit', () => {
     const q = { ...p, license: 'INVITED_ONLY' as const };
-    expect(canSeePlaylist(q, guest)).toBe(true);
+    expect(canSee(q, guest)).toBe(true);
     expect(canEditPlaylist(q, guest)).toBe(false);
     expect(canEditPlaylist(q, invited)).toBe(true);
     expect(canEditPlaylist(q, { userId: 'owner', invited: false })).toBe(true);
   });
   it('private: only invited users have access', () => {
     const q = { ...p, visibility: 'PRIVATE' as const };
-    expect(canSeePlaylist(q, guest)).toBe(false);
+    expect(canSee(q, guest)).toBe(false);
     expect(canEditPlaylist(q, guest)).toBe(false);
     expect(canEditPlaylist(q, invited)).toBe(true);
   });

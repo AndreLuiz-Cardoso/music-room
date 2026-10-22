@@ -1,8 +1,8 @@
 import { Type, type FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import { isUniqueViolation, prisma } from '../db';
-import { badRequest, notFound } from '../errors';
-import { IdParams, UserSummary, errors } from '../schemas';
-import { pairKey, userSummarySelect } from '../services/users';
+import { badRequest, conflict } from '../errors';
+import { IdParams, UserCard, errors } from '../schemas';
+import { ensureUser, pairKey, userCardSelect } from '../services/users';
 
 const FriendStatus = Type.Object({
   status: Type.Union([Type.Literal('request_sent'), Type.Literal('friend')]),
@@ -19,9 +19,9 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
         summary: 'My friends and pending requests',
         response: {
           200: Type.Object({
-            friends: Type.Array(UserSummary),
-            received: Type.Array(UserSummary),
-            sent: Type.Array(UserSummary),
+            friends: Type.Array(UserCard),
+            received: Type.Array(UserCard),
+            sent: Type.Array(UserCard),
           }),
         },
       },
@@ -30,7 +30,7 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
       const me = req.userId;
       const rows = await prisma.friendship.findMany({
         where: { OR: [{ userAId: me }, { userBId: me }] },
-        include: { userA: { select: userSummarySelect }, userB: { select: userSummarySelect } },
+        include: { userA: { select: userCardSelect }, userB: { select: userCardSelect } },
         orderBy: { updatedAt: 'desc' },
       });
       const other = (f: (typeof rows)[number]) => (f.userAId === me ? f.userB : f.userA);
@@ -51,33 +51,39 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
         description:
           'A single row exists per pair of users, so two users who invite each other at the same time end up friends.',
         params: IdParams,
-        response: { 200: FriendStatus, ...errors(400, 404) },
+        response: { 200: FriendStatus, ...errors(400, 404, 409) },
       },
     },
     async (req) => {
       const me = req.userId;
       const target = req.params.id;
       if (target === me) throw badRequest('SELF_FRIENDSHIP', 'You cannot befriend yourself');
-      if (!(await prisma.user.findUnique({ where: { id: target }, select: { id: true } }))) throw notFound('user');
+      await ensureUser(target);
 
       const key = pairKey(me, target);
-      for (let attempt = 0; attempt < 2; attempt++) {
+      // Each new attempt means the other user changed the pair meanwhile (sent or cancelled a request).
+      for (let attempt = 0; attempt < 5; attempt++) {
         const existing = await prisma.friendship.findUnique({ where: { userAId_userBId: key } });
         if (existing) {
           if (existing.status === 'ACCEPTED') return { status: 'friend' as const };
           if (existing.requesterId === me) return { status: 'request_sent' as const };
-          await prisma.friendship.update({ where: { id: existing.id }, data: { status: 'ACCEPTED' } });
-          return { status: 'friend' as const };
+          // only if the request is still there: it may have been cancelled meanwhile (then loop)
+          const accepted = await prisma.friendship.updateMany({
+            where: { id: existing.id, status: 'PENDING' },
+            data: { status: 'ACCEPTED' },
+          });
+          if (accepted.count === 1) return { status: 'friend' as const };
+          continue;
         }
         try {
           await prisma.friendship.create({ data: { ...key, requesterId: me } });
           return { status: 'request_sent' as const };
         } catch (err) {
-          // the other user sent a request at the same moment: loop once to accept it
+          // the other user sent a request at the same moment: loop to accept it
           if (!isUniqueViolation(err)) throw err;
         }
       }
-      throw new Error('unreachable');
+      throw conflict('FRIENDSHIP_CHANGED', 'The other user is changing this friendship right now, retry');
     },
   );
 

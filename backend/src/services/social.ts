@@ -14,11 +14,7 @@ export interface SocialIdentity {
   picture: string | null;
 }
 
-/**
- * Verifies the credential the mobile app obtained from the provider SDK. The app never
- * tells us "I am user X": we ask Google/Facebook ourselves, and check that the token was
- * issued for *our* application (otherwise a token from any other app could be replayed).
- */
+/** We verify provider tokens ourselves, and that they were issued for our app (no replay). */
 export interface SocialVerifier {
   verify(provider: Provider, credential: string): Promise<SocialIdentity>;
 }

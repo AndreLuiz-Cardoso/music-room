@@ -1,13 +1,15 @@
 import { Type, type FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
 import bcrypt from 'bcryptjs';
 import type { TokenKind, User } from '@prisma/client';
+import type { FastifyRequest } from 'fastify';
 import { config } from '../config';
 import { prisma } from '../db';
 import { ApiError, conflict, forbidden, tooManyRequests, unauthorized } from '../errors';
 import { issueSession, randomToken, revokeAllSessions, revokeSession, rotateSession, sha256 } from '../auth/tokens';
 import { Email, Message, Password, SessionResponse, errors } from '../schemas';
+import type { Mail } from '../services/mailer';
 import type { Provider, SocialIdentity } from '../services/social';
-import { toMe } from '../services/users';
+import { findUserByEmail, normalizeEmail, toMe } from '../services/users';
 import { HTML_CSP, messagePage, resetPasswordForm } from '../views';
 
 const MAX_FAILED_LOGINS = 5;
@@ -15,12 +17,12 @@ const LOCK_MS = 15 * 60_000;
 const VERIFY_TTL_MS = 24 * 3600_000;
 const RESET_TTL_MS = 3600_000;
 
-// Compared against when the email is unknown, so that response time does not reveal
-// whether an account exists.
+// Compared when the email is unknown, so the response time does not reveal if an account exists.
 const DUMMY_HASH = bcrypt.hashSync('dummy-password-for-timing', config.bcryptRounds);
 
 const routes: FastifyPluginAsyncTypebox = async (app) => {
-  const authLimit = { rateLimit: { max: config.rateLimit.auth, timeWindow: '1 minute' } };
+  // Always per address here: with the per-user key, any access token would open a fresh counter.
+  const authLimit = { rateLimit: { max: config.rateLimit.auth, timeWindow: '1 minute', keyGenerator: (req: FastifyRequest) => req.ip } };
 
   async function createOneTimeToken(userId: string, kind: TokenKind, ttlMs: number): Promise<string> {
     const token = randomToken();
@@ -41,9 +43,14 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
     return used.count === 1 ? stored.userId : null;
   }
 
+  /** Mails leave in the background: waiting only when an account exists would leak it by timing. */
+  function deliver(mail: Mail) {
+    app.mailer.send(mail).catch((err) => app.log.error({ err }, 'could not send an email'));
+  }
+
   async function sendVerificationMail(user: User) {
     const token = await createOneTimeToken(user.id, 'EMAIL_VERIFICATION', VERIFY_TTL_MS);
-    await app.mailer.send({
+    deliver({
       to: user.email,
       subject: 'Music Room - confirm your email',
       text: `Hello ${user.displayName},\n\nConfirm your email address by opening this link (valid 24h):\n${config.publicUrl}/auth/verify-email?token=${token}\n`,
@@ -94,10 +101,12 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
       },
     },
     async (req, reply) => {
-      const email = req.body.email.toLowerCase();
+      const email = normalizeEmail(req.body.email);
+      // hashed in both cases, so that the answer time is the same whether the email is known or not
+      const passwordHash = await bcrypt.hash(req.body.password, config.bcryptRounds);
       const existing = await prisma.user.findUnique({ where: { email } });
       if (existing) {
-        await app.mailer.send({
+        deliver({
           to: email,
           subject: 'Music Room - registration attempt',
           text: 'Someone tried to create an account with your email address, but you already have one.\nIf you forgot your password, use "Forgot password" in the application.\n',
@@ -107,7 +116,7 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
           data: {
             email,
             displayName: req.body.displayName.trim(),
-            passwordHash: await bcrypt.hash(req.body.password, config.bcryptRounds),
+            passwordHash,
           },
         });
         await sendVerificationMail(user);
@@ -159,7 +168,7 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
       },
     },
     async (req, reply) => {
-      const user = await prisma.user.findUnique({ where: { email: req.body.email.toLowerCase() } });
+      const user = await findUserByEmail(req.body.email);
       if (user && !user.emailVerified) await sendVerificationMail(user);
       return reply.code(204).send(null);
     },
@@ -180,21 +189,25 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
     },
     async (req) => {
       const now = new Date();
-      const user = await prisma.user.findUnique({ where: { email: req.body.email.toLowerCase() } });
+      const user = await findUserByEmail(req.body.email);
       if (user?.lockedUntil && user.lockedUntil > now) {
         throw tooManyRequests('ACCOUNT_LOCKED', 'Too many failed attempts, try again later or reset your password');
       }
       const valid = await bcrypt.compare(req.body.password, user?.passwordHash ?? DUMMY_HASH);
       if (!user || !user.passwordHash || !valid) {
         if (user) {
-          const failed = user.failedLogins + 1;
-          await prisma.user.update({
+          // Incremented in the database: parallel wrong guesses must all count.
+          const { failedLogins } = await prisma.user.update({
             where: { id: user.id },
-            data:
-              failed >= MAX_FAILED_LOGINS
-                ? { failedLogins: 0, lockedUntil: new Date(now.getTime() + LOCK_MS) }
-                : { failedLogins: failed },
+            data: { failedLogins: { increment: 1 } },
+            select: { failedLogins: true },
           });
+          if (failedLogins >= MAX_FAILED_LOGINS) {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { failedLogins: 0, lockedUntil: new Date(now.getTime() + LOCK_MS) },
+            });
+          }
         }
         throw unauthorized('INVALID_CREDENTIALS', 'Invalid email or password');
       }
@@ -204,12 +217,7 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
     },
   );
 
-  /**
-   * Social login. Unknown identity + unknown email: account creation. Unknown identity +
-   * known email: the identity is linked only if the provider certifies the email. If that
-   * existing account was never confirmed, its password is dropped: someone may have
-   * pre-registered the victim's address to take the account over later.
-   */
+  /** Links a known email only if the provider certifies it; unconfirmed accounts lose their password. */
   async function socialLogin(identity: SocialIdentity) {
     const byProvider = identity.provider === 'google' ? { googleId: identity.providerId } : { facebookId: identity.providerId };
     const linked = await prisma.user.findFirst({ where: byProvider });
@@ -218,7 +226,7 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
     if (!identity.email) {
       throw new ApiError(400, 'SOCIAL_EMAIL_REQUIRED', 'The provider did not share your email address');
     }
-    const email = identity.email.toLowerCase();
+    const email = normalizeEmail(identity.email);
     const existing = await prisma.user.findUnique({ where: { email } });
     if (!existing) {
       const user = await prisma.user.create({
@@ -267,7 +275,7 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
   app.post(
     '/refresh',
     {
-      config: authLimit,
+      // Only the global limit: refresh tokens can't be guessed, and party guests refresh all at once.
       schema: {
         tags: ['auth'],
         security: [],
@@ -316,10 +324,10 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
       },
     },
     async (req, reply) => {
-      const user = await prisma.user.findUnique({ where: { email: req.body.email.toLowerCase() } });
+      const user = await findUserByEmail(req.body.email);
       if (user) {
         const token = await createOneTimeToken(user.id, 'PASSWORD_RESET', RESET_TTL_MS);
-        await app.mailer.send({
+        deliver({
           to: user.email,
           subject: 'Music Room - reset your password',
           text: `Open this link to choose a new password (valid 1 hour):\n${config.publicUrl}/auth/reset-password?token=${token}\n\nIf you did not ask for it, ignore this email.`,
@@ -342,7 +350,7 @@ const routes: FastifyPluginAsyncTypebox = async (app) => {
     '/reset-password',
     {
       config: authLimit,
-      // Also accepts the HTML form; the password rule is checked by hand to re-display the form on error.
+      // Also accepts the HTML form; the password rule is checked by hand to re-display the form.
       schema: {
         tags: ['auth'],
         security: [],

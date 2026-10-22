@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { prisma } from '../src/db';
-import { createTestApp, createUser, lastMailToken, makeFriends, resetDb, type TestContext } from './helpers';
+import { createLoggedApp, createTestApp, createUser, lastMailToken, makeFriends, resetDb, type TestContext } from './helpers';
 
 let ctx: TestContext;
 const json = (res: { body: string }) => JSON.parse(res.body);
@@ -63,6 +63,13 @@ describe('email / password account', () => {
     expect(json(await login())).toMatchObject({ error: 'ACCOUNT_LOCKED' });
   });
 
+  it('locks the account when the failed attempts arrive all at once', async () => {
+    await register();
+    await ctx.app.inject({ method: 'POST', url: '/auth/verify-email', payload: { token: lastMailToken(ctx.mailer) } });
+    await Promise.all(Array.from({ length: 10 }, () => login(undefined, 'wrong1234')));
+    expect(json(await login())).toMatchObject({ error: 'ACCOUNT_LOCKED' });
+  });
+
   it('resets a forgotten password and revokes the open sessions', async () => {
     await register();
     await ctx.app.inject({ method: 'POST', url: '/auth/verify-email', payload: { token: lastMailToken(ctx.mailer) } });
@@ -99,6 +106,25 @@ describe('sessions', () => {
     // the legitimate (rotated) token is now revoked too
     const legit = await ctx.app.inject({ method: 'POST', url: '/auth/refresh', payload: { refreshToken: json(second).refreshToken } });
     expect(legit.statusCode).toBe(401);
+  });
+
+  it('changing the password closes the other sessions and renews this one', async () => {
+    await register();
+    await ctx.app.inject({ method: 'POST', url: '/auth/verify-email', payload: { token: lastMailToken(ctx.mailer) } });
+    const mine = json(await login());
+    const stolen = json(await login());
+
+    const change = await ctx.app.inject({
+      method: 'PUT',
+      url: '/me/password',
+      headers: { authorization: `Bearer ${mine.accessToken}` },
+      payload: { currentPassword: 'secret123', newPassword: 'newSecret42' },
+    });
+    expect(change.statusCode).toBe(200);
+
+    const refresh = (refreshToken: string) => ctx.app.inject({ method: 'POST', url: '/auth/refresh', payload: { refreshToken } });
+    expect((await refresh(stolen.refreshToken)).statusCode).toBe(401);
+    expect((await refresh(json(change).refreshToken)).statusCode).toBe(200);
   });
 
   it('refuses requests without a valid access token', async () => {
@@ -181,6 +207,36 @@ describe('profile privacy', () => {
     ]);
     const list = json(await ctx.app.inject({ method: 'GET', url: '/friends', headers: a.auth }));
     expect(list.friends.map((f: { id: string }) => f.id)).toEqual([b.id]);
+  });
+});
+
+describe('friend requests', () => {
+  it('accepting a request cancelled at the same moment never answers 500', async () => {
+    const statuses = new Set<number>();
+    for (let i = 0; i < 20; i++) {
+      const [a, b] = await Promise.all([createUser('asker'), createUser('accepter')]);
+      await ctx.app.inject({ method: 'POST', url: `/friends/${b.id}`, headers: a.auth });
+      const [accept] = await Promise.all([
+        ctx.app.inject({ method: 'POST', url: `/friends/${a.id}`, headers: b.auth }),
+        ctx.app.inject({ method: 'DELETE', url: `/friends/${b.id}`, headers: a.auth }),
+      ]);
+      statuses.add(accept.statusCode);
+    }
+    expect([...statuses].filter((s) => s >= 500)).toEqual([]);
+  });
+});
+
+describe('request logs', () => {
+  it('do not contain the one-time tokens of the email links', async () => {
+    const { app, logs } = await createLoggedApp();
+    await app.inject({ method: 'GET', url: '/auth/reset-password?token=reset-secret-1234' });
+    await app.inject({ method: 'GET', url: '/auth/verify-email?token=verify-secret-5678' });
+    await app.close();
+
+    const log = logs();
+    expect(log).toContain('/auth/reset-password');
+    expect(log).not.toContain('reset-secret-1234');
+    expect(log).not.toContain('verify-secret-5678');
   });
 });
 

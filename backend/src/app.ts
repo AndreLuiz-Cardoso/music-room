@@ -40,19 +40,33 @@ export interface AppDeps {
   catalog?: TrackCatalog;
   mailer?: Mailer;
   social?: SocialVerifier;
-  logger?: boolean;
+  /** false: no logs; a stream: the logs go there instead of stdout (tests). */
+  logger?: false | NodeJS.WritableStream;
 }
+
+// Request log line without the one-time tokens that email links carry in the query string.
+const serializers = {
+  req: (req: FastifyRequest) => ({
+    method: req.method,
+    url: req.url.replace(/([?&]token=)[^&]*/g, '$1[redacted]'),
+    host: req.host,
+    remoteAddress: req.ip,
+    remotePort: req.socket?.remotePort,
+  }),
+};
 
 export async function buildApp(deps: AppDeps = {}) {
   const app = Fastify({
     logger:
       deps.logger === false
         ? false
-        : config.env === 'development'
-          ? { transport: { target: 'pino-pretty' } }
-          : true,
+        : deps.logger
+          ? { stream: deps.logger, serializers }
+          : config.env === 'development'
+            ? { transport: { target: 'pino-pretty' }, serializers }
+            : { serializers },
     bodyLimit: 100 * 1024,
-    trustProxy: true,
+    trustProxy: config.trustProxy,
     ajv: { customOptions: { removeAdditional: 'all' } },
   }).withTypeProvider<TypeBoxTypeProvider>();
 
@@ -74,11 +88,38 @@ export async function buildApp(deps: AppDeps = {}) {
 
   // The API only speaks JSON; the few HTML pages (email links) set their own strict CSP.
   await app.register(helmet, { contentSecurityPolicy: false });
-  await app.register(cors, { origin: config.corsOrigins.length ? config.corsOrigins : false });
+  await app.register(cors, {
+    origin: config.corsOrigins.length ? config.corsOrigins : false,
+    // the plugin allows only GET, HEAD and POST by default: the web app also edits and deletes
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
+  });
   await app.register(formbody);
+  // Behind an undeclared proxy every client gets the proxy's address and shares its rate limits.
+  if (!config.trustProxy) {
+    let warned = false;
+    app.addHook('onRequest', async (req) => {
+      if (warned || !req.headers['x-forwarded-for']) return;
+      warned = true;
+      req.log.warn('X-Forwarded-For received but TRUST_PROXY is not set: all clients are seen as the proxy address (see .env.example)');
+    });
+  }
   await app.register(rateLimit, {
     max: config.rateLimit.global,
     timeWindow: '1 minute',
+    // Per user when signed in (party guests share the venue's IP), per IP for anonymous requests.
+    keyGenerator: (req) => {
+      // the limiter is a route hook: on the authenticated routes, the token was verified just before
+      if (req.userId) return `user:${req.userId}`;
+      const header = req.headers.authorization;
+      if (header?.startsWith('Bearer ')) {
+        try {
+          return `user:${verifyAccessToken(header.slice(7))}`;
+        } catch {
+          // invalid token: counted by address, then refused by the route
+        }
+      }
+      return req.ip;
+    },
     errorResponseBuilder: (_req, ctx) => ({
       statusCode: 429,
       error: 'RATE_LIMITED',

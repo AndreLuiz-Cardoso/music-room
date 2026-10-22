@@ -1,8 +1,6 @@
 import { Type, type TSchema, type Static } from '@sinclair/typebox';
 
-// Shared request/response schemas. They validate inputs, filter outputs (fields that
-// are not declared are never serialized: no accidental passwordHash leak) and generate
-// the OpenAPI documentation served on /docs.
+// Validate inputs, filter outputs (undeclared fields are never sent) and generate the OpenAPI doc.
 
 export const Nullable = <T extends TSchema>(schema: T) => Type.Union([schema, Type.Null()]);
 
@@ -10,7 +8,6 @@ export const Id = Type.String({ minLength: 1, maxLength: 64 });
 export const IdParams = Type.Object({ id: Id });
 /** Output dates: Prisma gives Date objects, serialized as ISO 8601 strings. */
 export const DateTime = Type.Unsafe<Date | string>({ type: 'string', format: 'date-time' });
-/** Input dates: ISO 8601 strings. */
 export const DateTimeInput = Type.String({ format: 'date-time' });
 
 export const ErrorResponse = Type.Object(
@@ -41,24 +38,36 @@ export const GeoInput = Type.Object({
   longitude: Type.Number({ minimum: -180, maximum: 180 }),
 });
 
+/** The lists of events and playlists. */
+export const ListQuery = Type.Object({
+  filter: Type.Optional(Type.Union([Type.Literal('all'), Type.Literal('mine'), Type.Literal('invited')], { default: 'all' })),
+  q: Type.Optional(Type.String({ maxLength: 100, description: 'Name search' })),
+});
+
 export const UserSummary = Type.Object({
   id: Type.String(),
   displayName: Type.String(),
   avatarUrl: Nullable(Type.String()),
-  musicPreferences: Type.Array(Type.String()),
 });
 export type UserSummaryT = Static<typeof UserSummary>;
+
+/** A user in search results and friend lists, which show their music taste. */
+export const UserCard = Type.Object({ ...UserSummary.properties, musicPreferences: Type.Array(Type.String()) });
+
+const ProfileFields = {
+  displayName: Type.String(),
+  avatarUrl: Nullable(Type.String()),
+  bio: Nullable(Type.String()),
+  musicPreferences: Type.Array(Type.String()),
+  friendsInfo: Nullable(Type.String({ description: 'Only returned to friends and to the user' })),
+  privateInfo: Nullable(Type.String({ description: 'Only returned to the user' })),
+};
 
 export const Me = Type.Object({
   id: Type.String(),
   email: Type.String(),
   emailVerified: Type.Boolean(),
-  displayName: Type.String(),
-  avatarUrl: Nullable(Type.String()),
-  bio: Nullable(Type.String()),
-  musicPreferences: Type.Array(Type.String()),
-  friendsInfo: Nullable(Type.String()),
-  privateInfo: Nullable(Type.String()),
+  ...ProfileFields,
   hasPassword: Type.Boolean(),
   linkedProviders: Type.Object({ google: Type.Boolean(), facebook: Type.Boolean() }),
   createdAt: DateTime,
@@ -74,12 +83,7 @@ export const Relation = Type.Union([
 
 export const Profile = Type.Object({
   id: Type.String(),
-  displayName: Type.String(),
-  avatarUrl: Nullable(Type.String()),
-  bio: Nullable(Type.String()),
-  musicPreferences: Type.Array(Type.String()),
-  friendsInfo: Nullable(Type.String({ description: 'Only returned to friends and to the user' })),
-  privateInfo: Nullable(Type.String({ description: 'Only returned to the user' })),
+  ...ProfileFields,
   relation: Relation,
 });
 
@@ -90,18 +94,7 @@ export const SessionResponse = Type.Object({
   user: Me,
 });
 
-export const Track = Type.Object({
-  id: Type.String({ description: 'Catalog id, e.g. deezer:3135556' }),
-  title: Type.String(),
-  artist: Type.String(),
-  album: Nullable(Type.String()),
-  coverUrl: Nullable(Type.String()),
-  previewUrl: Nullable(Type.String()),
-  durationSec: Type.Integer(),
-});
-
-const TrackFields = {
-  trackId: Type.String(),
+const CatalogFields = {
   title: Type.String(),
   artist: Type.String(),
   album: Nullable(Type.String()),
@@ -110,20 +103,26 @@ const TrackFields = {
   durationSec: Type.Integer(),
 };
 
-// ---------- events ----------
+export const Track = Type.Object({
+  id: Type.String({ description: 'Catalog id, e.g. deezer:3135556' }),
+  ...CatalogFields,
+});
+
+/** A catalog track stored in an event queue or a playlist (its own id is the entry's). */
+const TrackFields = { trackId: Type.String(), ...CatalogFields };
 
 export const EventTrack = Type.Object({
   id: Type.String({ description: 'Queue entry id' }),
   ...TrackFields,
   score: Type.Integer(),
   status: Type.Union([Type.Literal('QUEUED'), Type.Literal('PLAYING'), Type.Literal('PLAYED')]),
-  suggestedById: Type.String(),
   createdAt: DateTime,
 });
 
+/** Everyone sees the size of the vote area; only the owner gets its coordinates (for the edit form). */
 export const EventLocation = Type.Object({
-  latitude: Type.Number(),
-  longitude: Type.Number(),
+  latitude: Type.Optional(Type.Number({ description: 'Owner only' })),
+  longitude: Type.Optional(Type.Number({ description: 'Owner only' })),
   radiusMeters: Type.Integer(),
 });
 export const VoteWindow = Type.Object({ startsAt: DateTime, endsAt: DateTime });
@@ -135,7 +134,6 @@ const EventCommon = {
   owner: UserSummary,
   visibility: Visibility,
   license: EventLicense,
-  location: Nullable(EventLocation),
   voteWindow: Nullable(VoteWindow),
   createdAt: DateTime,
 };
@@ -148,6 +146,7 @@ export const EventSummary = Type.Object({
 
 export const EventState = Type.Object({
   ...EventCommon,
+  location: Nullable(EventLocation),
   version: Type.Integer({ description: 'Incremented on every change, lets clients drop stale updates' }),
   nowPlaying: Nullable(EventTrack),
   queue: Type.Array(EventTrack, { description: 'Sorted by score desc, then suggestion time' }),
@@ -163,13 +162,10 @@ export const EventDetail = Type.Object({
   requiresLocation: Type.Boolean(),
 });
 
-// ---------- playlists ----------
-
 export const PlaylistTrack = Type.Object({
   id: Type.String({ description: 'Playlist entry id' }),
   position: Type.Integer(),
   ...TrackFields,
-  addedById: Type.String(),
 });
 
 const PlaylistCommon = {
@@ -199,8 +195,6 @@ export const PlaylistDetail = Type.Object({
   canEdit: Type.Boolean(),
 });
 
-// ---------- devices ----------
-
 export const PlaybackTrack = Type.Object({
   id: Type.String(),
   title: Type.String(),
@@ -227,12 +221,8 @@ export const DeviceState = Type.Object({
   id: Type.String(),
   name: Type.String(),
   owner: UserSummary,
-  platform: Nullable(Type.String()),
-  model: Nullable(Type.String()),
-  appVersion: Nullable(Type.String()),
   playback: Playback,
   version: Type.Integer(),
-  lastSeenAt: DateTime,
 });
 
 export const DeviceDetail = Type.Object({
