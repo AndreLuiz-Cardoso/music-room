@@ -18,6 +18,8 @@
   estado de reprodução de cada aparelho) vive no PostgreSQL. O app só envia comandos e mostra o estado.
 - **Fluxo de escrita**: o app chama a API REST → a API valida, verifica permissões e grava numa
   transação → a API envia o novo estado por WebSocket a quem está inscrito naquele recurso.
+  Ao se inscrever (também depois de cada reconexão) o socket recebe o estado atual: o que foi
+  enviado enquanto ele estava fora da sala não se perde.
 - **O WebSocket é só de leitura** (push). Nenhuma escrita passa por ele: uma única porta de entrada
   para escrever (REST) significa um único lugar para validar, autorizar e registrar logs.
 
@@ -33,7 +35,7 @@
 | API | **REST + JSON** | Pedido pelo enunciado; universal, cacheável, fácil de testar com curl/Swagger; JSON é nativo no JS | GraphQL (overfetching resolvido, mas mais complexo de proteger e de limitar), gRPC (binário, ruim para web/mobile simples) |
 | Documentação | **OpenAPI 3 / Swagger UI** gerada dos schemas | A doc nunca diverge do código: o mesmo schema valida, serializa e documenta | Doc escrita à mão |
 | Mobile | **React Native + Expo SDK 58** (Expo Router) | TypeScript como no back; roda em Android, iOS e web (base para o bônus multiplataforma); builds sem Android Studio via EAS | Flutter (Dart, segunda linguagem), Kotlin nativo (só Android) |
-| Catálogo musical | **API pública Deezer** | Gratuita, sem chave, com prévias de 30 s. **O SDK não faz o nosso trabalho**: só busca metadados; votos, playlists e delegação são nossos | Spotify (exige Premium para tocar), YouTube (ToS restritivos) |
+| Catálogo musical | **API pública Deezer** | Gratuita, sem chave, com prévias de 30 s. **O SDK não faz o nosso trabalho**: só busca metadados; votos, playlists e delegação são nossos. Os links das prévias do Deezer são assinados e expiram em 15 min: a API nunca os guarda para tocar mais tarde, ela expõe `/tracks/<id>/preview?sig=…`, que redireciona para um link novo no momento de tocar. O endereço é assinado: a rota é pública (o player de áudio não manda token), mas só consulta o Deezer para as faixas que a API guardou | Spotify (exige Premium para tocar), YouTube (ToS restritivos) |
 
 ## Modelo de dados (resumo)
 
@@ -101,6 +103,15 @@ O broadcast é **agrupado** (no máximo um envio a cada 100 ms por sala): numa f
 por segundo, o servidor recarrega e envia o estado ~10×/s em vez de uma vez por voto. O cliente sempre
 recebe o estado mais recente (com sua `version`).
 
+### Protocolo de tempo real
+
+O canal Socket.IO só envia: toda mudança passa pela API REST, que depois transmite o novo estado aos
+inscritos. O cliente se inscreve emitindo `subscribe` com o nome de uma sala (`event:<id>`,
+`playlist:<id>` ou `device:<id>`), o que exige a mesma permissão de leitura do GET correspondente, e sai
+com `unsubscribe`. Ao se inscrever, recebe primeiro o estado atual e depois a confirmação `{ ok: boolean }`.
+O servidor envia `event:state`, `playlist:state` e `device:state` (o mesmo objeto do GET) e
+`<tipo>:deleted` quando o recurso é apagado.
+
 ## Organização do código
 
 ```
@@ -120,6 +131,16 @@ mobile/
   src/lib/             cliente da API, sessão, tempo real, login social
   src/components/      UI compartilhada, player do aparelho
 ```
+
+Cada regra é escrita uma vez só, e todo o resto a usa:
+
+| Regra | Onde |
+|---|---|
+| Quem vê um evento ou uma playlist (em memória e como filtro das listas) | `domain/policies.ts`: `canSee`, `visibleWhere` |
+| Cópia de uma faixa do catálogo (gravação e exibição, endereço da prévia assinado) | `services/catalog.ts`: `toStoredTrack`, `fromStoredTrack`, `previewAddress` |
+| E-mail em minúsculas, usuário existente, lista de convidados | `services/users.ts`: `normalizeEmail`, `findUserByEmail`, `ensureUser`, `invitees` |
+| Campos comuns dos schemas (perfil, faixa, filtro das listas) | `schemas.ts`: `ProfileFields`, `CatalogFields`, `ListQuery` |
+| Telas de eventos e playlists: rótulos de visibilidade/licença, convidados, busca nas listas, exclusão | `mobile/src/components/shared.tsx`, `mobile/src/lib/hooks.ts` (`useListSearch`, `confirmDelete`) |
 
 ## Testes por camada
 

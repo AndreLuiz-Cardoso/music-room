@@ -24,7 +24,7 @@ Documentação: [arquitetura e decisões](docs/ARCHITECTURE.md) · [segurança](
 
 - Node.js ≥ 20 e npm
 - PostgreSQL: **nenhuma instalação necessária**. `make db` sobe um PostgreSQL embutido, baixado pelo
-  npm. Com Docker, `make db-docker` também funciona.
+  npm. Com Docker, `make db-docker` também funciona, com as mesmas configurações (`DATABASE_URL`).
 - Mobile: o app Expo Go para o básico, ou Android Studio / EAS para um *development build* (necessário
   para login Google/Facebook)
 
@@ -36,20 +36,24 @@ Sem `make` (Windows), use os scripts npm equivalentes: `npm run setup`, `npm run
 ```bash
 make install                         # dependências do back-end e do app (npm ci)
 
-cp backend/.env.example backend/.env # e defina um JWT_SECRET (instruções no arquivo)
+cp backend/.env.example backend/.env # e defina um JWT_SECRET e a senha do banco (instruções no arquivo)
 cp mobile/.env.example mobile/.env   # endereço da API, ids Google/Facebook
 
 make db                              # terminal 1: PostgreSQL local (fica rodando)
+make mail                            # terminal 2: caixa de e-mails local em http://localhost:1080
 make migrate                         # cria as tabelas
-make dev                             # terminal 2: API em http://localhost:3000 (Swagger em /docs)
-make mobile                          # terminal 3: app (a = Android, w = web)
+make dev                             # terminal 3: API em http://localhost:3000 (Swagger em /docs)
+make mobile                          # terminal 4: app (a = Android, w = web)
 ```
 
-Sem SMTP configurado, os e-mails (validação de conta, redefinição de senha) **aparecem no log da API**:
-basta abrir o link impresso.
+Os e-mails (validação de conta, redefinição de senha) chegam à **caixa local de `make mail`**, em
+http://localhost:1080: nenhum cadastro num provedor, nada sai da máquina. Abra o link do e-mail neste
+computador (ele aponta para `PUBLIC_URL`). Sem `SMTP_HOST` no `.env`, eles aparecem no log da API.
 
-O endereço da API pode ser alterado no app (tela de login → "Server"), para testar contra outro servidor.
-No emulador Android, `localhost` do PC é `http://10.0.2.2:3000`; num celular, use o IP da máquina na rede.
+Em builds de desenvolvimento, o endereço da API pode ser alterado abrindo `/server` (no web:
+http://localhost:8081/server), para testar contra outro servidor.
+No emulador Android, `localhost` do PC é `http://10.0.2.2:3000` (o valor do `.env.example`); o app web e o
+simulador iOS usam `localhost` com o mesmo `.env`. Num celular, use o IP da máquina na rede.
 
 ### Login Google / Facebook
 
@@ -68,13 +72,24 @@ O app recebe uma credencial do Google/Facebook, mas é o **back-end** que a veri
 ## Testes
 
 ```bash
-make test     # 58 testes: regras de domínio + integração API/PostgreSQL (concorrência, segurança, tempo real)
+make test     # 84 testes: regras de domínio + integração API/PostgreSQL (concorrência, segurança, tempo real)
 make lint     # typecheck back e app + lint do app
 make load     # teste de carga (ver docs/RAMPUP.md)
+make e2e      # o app web num navegador de verdade, no modo UI do Playwright (tempo real, áudio, sessão)
+make e2e-cli  # os mesmos checks no terminal (~1 min)
 ```
 
 Os testes criam e migram sozinhos um banco `musicroom_test` (configurável via `TEST_DATABASE_URL`).
 A CI (GitHub Actions) roda typecheck, testes, build e lint a cada push.
+
+`make e2e` precisa da API (`make dev`) e do app (`make mobile`, que também serve o app web) rodando. Ele
+cria três contas, usa o app como usuários de verdade (Playwright + Chromium, com a política de autoplay
+real do navegador) e apaga as contas no fim. Abre o **modo UI do Playwright**: a lista dos checks, que se
+rodam todos ou um por um, com a linha do tempo de cada passo (capturas, DOM, rede) e a opção de ver o
+navegador agindo. `make e2e-cli` roda os mesmos checks no terminal e gera um relatório HTML
+(`cd e2e && npx playwright show-report`). A verificação da expiração do WebSocket, que leva 16 minutos,
+fica no projeto `slow`: marque-a no modo UI ou rode `cd e2e && npm run checks:slow`. Numa distribuição Linux que o Playwright ainda não conhece,
+defina `PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64`.
 
 ## Estrutura
 

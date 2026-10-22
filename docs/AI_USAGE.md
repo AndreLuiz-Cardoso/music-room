@@ -27,7 +27,7 @@ Antes de qualquer código, a IA apresentou as alternativas e **a equipe escolheu
 
 ## O que foi verificado (e como)
 
-- 58 testes automatizados (unitários + integração em PostgreSQL real), todos passando, executados
+- 79 testes automatizados (unitários + integração em PostgreSQL real), todos passando, executados
   várias vezes seguidas para descartar instabilidade.
 - Teste ponta a ponta manual via curl contra o servidor real (cadastro, link de e-mail, login, busca no
   Deezer, evento, sugestão).

@@ -5,13 +5,18 @@
   "scripts": {
     "setup": "npm --prefix backend ci && npm --prefix mobile ci",
     "db": "npm --prefix backend run db:local",
+    "db:docker": "npm --prefix backend run db:docker",
+    "mail": "npm --prefix backend run mail:local",
     "migrate": "npm --prefix backend run db:migrate",
     "dev": "npm --prefix backend run dev",
     "mobile": "npm --prefix mobile start",
+    "android": "npm --prefix mobile run android",
     "test": "npm --prefix backend test",
     "lint": "npm --prefix backend run typecheck && npm --prefix mobile run typecheck && cd mobile && npx expo lint",
     "build": "npm --prefix backend run build",
     "docs": "npm --prefix backend run docs:openapi",
-    "load": "npm --prefix backend run load"
+    "load": "npm --prefix backend run load",
+    "e2e": "npm --prefix e2e ci && cd e2e && npx playwright install chromium && npm run checks:ui",
+    "e2e:cli": "npm --prefix e2e ci && cd e2e && npx playwright install chromium && npm run checks"
   }
 }

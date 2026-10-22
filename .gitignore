@@ -14,6 +14,10 @@ mobile/ios/
 .env.*
 !.env.example
 
+# Playwright results and reports (e2e)
+e2e/test-results/
+e2e/playwright-report/
+
 # local database (embedded PostgreSQL for dev without Docker)
 .pgdata/
 

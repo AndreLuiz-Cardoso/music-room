@@ -21,6 +21,9 @@ fica em `backend/load/results.json`.
 Os cenários são de **pior caso**: todos os usuários disputam **o mesmo** evento, a mesma playlist e o
 mesmo aparelho. Os locks são por recurso, então eventos diferentes não se bloqueiam.
 
+Por fim, o script mede o **tempo real**: 100, 500 e 1000 "telemóveis" ligados por WebSocket (Socket.IO)
+seguem o evento enquanto 50 conexões votam sem parar (`LOAD_PHONES=200,2000` muda os degraus).
+
 ## Máquina de teste
 
 | | |
@@ -69,6 +72,31 @@ mesmo aparelho. Os locks são por recurso, então eventos diferentes não se blo
 - Coerente com o enunciado: "milhares para um servidor modesto". Num Raspberry Pi 4 esperamos algumas
   dezenas a poucas centenas de usuários.
 
+## Tempo real (WebSocket)
+
+Numa festa, cada voto muda a fila de **todos** os telemóveis presentes. O script liga N sockets ao
+mesmo evento enquanto 50 conexões votam sem parar nesse evento. A cada 500 ms uma "sonda" vota e
+mede, para cada telemóvel, o tempo entre **enviar o voto** e **receber a fila atualizada** (o que um
+convidado vê). As atualizações são agrupadas no servidor (no máximo 10 por segundo por sala).
+
+Máquina desta medição: VM KVM com Intel Core i7-10700 (8 vCPUs), 9 GB de RAM, Linux, Node.js 24.22,
+PostgreSQL 18.4 embutido. API, banco, gerador de carga **e os 1000 sockets** no mesmo processo/máquina.
+
+| Telemóveis ligados | Votos/s no evento | Atraso p50 | Atraso p99 | Atualizações perdidas |
+|---:|---:|---:|---:|---:|
+| 100 | 270 | 203 ms | 386 ms | 0 % |
+| 500 | 267 | 233 ms | 602 ms | 0 % |
+| 1000 | 232 | 242 ms | 433 ms | 0 % |
+
+- **Nenhuma atualização perdida**: todos os telemóveis recebem a versão de cada voto da sonda (ou uma
+  mais recente), mesmo com 1000 inscritos no mesmo evento.
+- O atraso fica em ~¼ de segundo e muda pouco de 100 para 1000 telemóveis: o custo dominante é o próprio
+  voto sob carga, não a difusão. O agrupamento faz o servidor enviar no máximo 10 mensagens/s por sala,
+  qualquer que seja o número de votos.
+- Com 1000 telemóveis a vazão de votos cai ~15 % (270 → 232 votos/s): o broadcast custa CPU no mesmo
+  processo. Um evento com **1000 convidados ligados** e um voto a cada 30 s por pessoa gera ~33 votos/s,
+  bem abaixo do que foi medido.
+
 ## O que os testes de carga mudaram no código
 
 O teste de carga e os testes de corrida orientaram três mudanças (antes → depois, 200 conexões):
@@ -88,5 +116,5 @@ O teste de carga e os testes de corrida orientaram três mudanças (antes → de
   Socket.IO precisa então do adapter Redis para compartilhar as salas.
 - **Banco dedicado**: PostgreSQL numa máquina separada; `connection_limit` ajustado; PgBouncer.
 - **Leituras**: cache de curta duração do estado de um evento (o mesmo estado é lido por todos).
-- **Ainda não medido**: o número máximo de conexões WebSocket simultâneas e o custo do broadcast para
-  N inscritos. Ferramentas possíveis: `artillery` com o engine socket.io, ou um script com `socket.io-client`.
+- **WebSocket**: acima de alguns milhares de sockets por processo, separar o gerador de carga da API para
+  medir o teto real, e usar o adapter Redis do Socket.IO para repartir os sockets entre processos.

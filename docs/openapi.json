@@ -342,10 +342,12 @@
                           }
                         },
                         "friendsInfo": {
+                          "description": "Only returned to friends and to the user",
                           "type": "string",
                           "nullable": true
                         },
                         "privateInfo": {
+                          "description": "Only returned to the user",
                           "type": "string",
                           "nullable": true
                         },
@@ -548,10 +550,12 @@
                           }
                         },
                         "friendsInfo": {
+                          "description": "Only returned to friends and to the user",
                           "type": "string",
                           "nullable": true
                         },
                         "privateInfo": {
+                          "description": "Only returned to the user",
                           "type": "string",
                           "nullable": true
                         },
@@ -778,10 +782,12 @@
                           }
                         },
                         "friendsInfo": {
+                          "description": "Only returned to friends and to the user",
                           "type": "string",
                           "nullable": true
                         },
                         "privateInfo": {
+                          "description": "Only returned to the user",
                           "type": "string",
                           "nullable": true
                         },
@@ -1008,10 +1014,12 @@
                           }
                         },
                         "friendsInfo": {
+                          "description": "Only returned to friends and to the user",
                           "type": "string",
                           "nullable": true
                         },
                         "privateInfo": {
+                          "description": "Only returned to the user",
                           "type": "string",
                           "nullable": true
                         },
@@ -1255,10 +1263,12 @@
                       }
                     },
                     "friendsInfo": {
+                      "description": "Only returned to friends and to the user",
                       "type": "string",
                       "nullable": true
                     },
                     "privateInfo": {
+                      "description": "Only returned to the user",
                       "type": "string",
                       "nullable": true
                     },
@@ -1394,10 +1404,12 @@
                       }
                     },
                     "friendsInfo": {
+                      "description": "Only returned to friends and to the user",
                       "type": "string",
                       "nullable": true
                     },
                     "privateInfo": {
+                      "description": "Only returned to the user",
                       "type": "string",
                       "nullable": true
                     },
@@ -1461,6 +1473,7 @@
         "tags": [
           "profile"
         ],
+        "description": "Revokes every open session of the account (a stolen one included) and returns a new session for this device.",
         "requestBody": {
           "required": true,
           "content": {
@@ -1488,8 +1501,110 @@
           }
         },
         "responses": {
-          "204": {
-            "description": "Default Response"
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "accessToken",
+                    "refreshToken",
+                    "expiresIn",
+                    "user"
+                  ],
+                  "properties": {
+                    "accessToken": {
+                      "type": "string"
+                    },
+                    "refreshToken": {
+                      "type": "string"
+                    },
+                    "expiresIn": {
+                      "description": "Access token lifetime in seconds",
+                      "type": "integer"
+                    },
+                    "user": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "email",
+                        "emailVerified",
+                        "displayName",
+                        "avatarUrl",
+                        "bio",
+                        "musicPreferences",
+                        "friendsInfo",
+                        "privateInfo",
+                        "hasPassword",
+                        "linkedProviders",
+                        "createdAt"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "emailVerified": {
+                          "type": "boolean"
+                        },
+                        "displayName": {
+                          "type": "string"
+                        },
+                        "avatarUrl": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "bio": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "musicPreferences": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "friendsInfo": {
+                          "description": "Only returned to friends and to the user",
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "privateInfo": {
+                          "description": "Only returned to the user",
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "hasPassword": {
+                          "type": "boolean"
+                        },
+                        "linkedProviders": {
+                          "type": "object",
+                          "required": [
+                            "google",
+                            "facebook"
+                          ],
+                          "properties": {
+                            "google": {
+                              "type": "boolean"
+                            },
+                            "facebook": {
+                              "type": "boolean"
+                            }
+                          }
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
           "400": {
             "description": "Error",
@@ -1617,10 +1732,12 @@
                       }
                     },
                     "friendsInfo": {
+                      "description": "Only returned to friends and to the user",
                       "type": "string",
                       "nullable": true
                     },
                     "privateInfo": {
+                      "description": "Only returned to the user",
                       "type": "string",
                       "nullable": true
                     },
@@ -1779,10 +1896,12 @@
                       }
                     },
                     "friendsInfo": {
+                      "description": "Only returned to friends and to the user",
                       "type": "string",
                       "nullable": true
                     },
                     "privateInfo": {
+                      "description": "Only returned to the user",
                       "type": "string",
                       "nullable": true
                     },
@@ -1915,10 +2034,12 @@
                       }
                     },
                     "friendsInfo": {
+                      "description": "Only returned to friends and to the user",
                       "type": "string",
                       "nullable": true
                     },
                     "privateInfo": {
+                      "description": "Only returned to the user",
                       "type": "string",
                       "nullable": true
                     },
@@ -2077,10 +2198,12 @@
                       }
                     },
                     "friendsInfo": {
+                      "description": "Only returned to friends and to the user",
                       "type": "string",
                       "nullable": true
                     },
                     "privateInfo": {
+                      "description": "Only returned to the user",
                       "type": "string",
                       "nullable": true
                     },
@@ -2555,6 +2678,30 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Error",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "description": "Machine readable code",
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       },
@@ -2689,6 +2836,87 @@
         }
       }
     },
+    "/tracks/{id}/preview": {
+      "get": {
+        "summary": "Listen to the 30 s preview of a track",
+        "tags": [
+          "tracks"
+        ],
+        "description": "Redirects (302) to a fresh link of the catalog. Catalog links expire, so the API gives this stable address as the previewUrl of the tracks it stores (event queues, playlists, device queues). The address is signed (`sig`): any other track id answers 404 without a catalog lookup.",
+        "parameters": [
+          {
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            },
+            "in": "query",
+            "name": "sig",
+            "required": false
+          },
+          {
+            "schema": {
+              "minLength": 1,
+              "maxLength": 64,
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "404": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Error",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "description": "Machine readable code",
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Error",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "description": "Machine readable code",
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/events/": {
       "get": {
         "summary": "Events I can see",
@@ -2731,7 +2959,8 @@
             },
             "in": "query",
             "name": "q",
-            "required": false
+            "required": false,
+            "description": "Name search"
           }
         ],
         "responses": {
@@ -2750,7 +2979,6 @@
                       "owner",
                       "visibility",
                       "license",
-                      "location",
                       "voteWindow",
                       "createdAt",
                       "isOwner",
@@ -2772,8 +3000,7 @@
                         "required": [
                           "id",
                           "displayName",
-                          "avatarUrl",
-                          "musicPreferences"
+                          "avatarUrl"
                         ],
                         "properties": {
                           "id": {
@@ -2785,12 +3012,6 @@
                           "avatarUrl": {
                             "type": "string",
                             "nullable": true
-                          },
-                          "musicPreferences": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
                           }
                         }
                       },
@@ -2831,26 +3052,6 @@
                             ]
                           }
                         ]
-                      },
-                      "location": {
-                        "type": "object",
-                        "required": [
-                          "latitude",
-                          "longitude",
-                          "radiusMeters"
-                        ],
-                        "properties": {
-                          "latitude": {
-                            "type": "number"
-                          },
-                          "longitude": {
-                            "type": "number"
-                          },
-                          "radiusMeters": {
-                            "type": "integer"
-                          }
-                        },
-                        "nullable": true
                       },
                       "voteWindow": {
                         "type": "object",
@@ -3014,9 +3215,9 @@
                     "owner",
                     "visibility",
                     "license",
-                    "location",
                     "voteWindow",
                     "createdAt",
+                    "location",
                     "version",
                     "nowPlaying",
                     "queue",
@@ -3043,8 +3244,7 @@
                       "required": [
                         "id",
                         "displayName",
-                        "avatarUrl",
-                        "musicPreferences"
+                        "avatarUrl"
                       ],
                       "properties": {
                         "id": {
@@ -3056,12 +3256,6 @@
                         "avatarUrl": {
                           "type": "string",
                           "nullable": true
-                        },
-                        "musicPreferences": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
                         }
                       }
                     },
@@ -3103,26 +3297,6 @@
                         }
                       ]
                     },
-                    "location": {
-                      "type": "object",
-                      "required": [
-                        "latitude",
-                        "longitude",
-                        "radiusMeters"
-                      ],
-                      "properties": {
-                        "latitude": {
-                          "type": "number"
-                        },
-                        "longitude": {
-                          "type": "number"
-                        },
-                        "radiusMeters": {
-                          "type": "integer"
-                        }
-                      },
-                      "nullable": true
-                    },
                     "voteWindow": {
                       "type": "object",
                       "required": [
@@ -3145,6 +3319,26 @@
                       "type": "string",
                       "format": "date-time"
                     },
+                    "location": {
+                      "type": "object",
+                      "required": [
+                        "radiusMeters"
+                      ],
+                      "properties": {
+                        "latitude": {
+                          "description": "Owner only",
+                          "type": "number"
+                        },
+                        "longitude": {
+                          "description": "Owner only",
+                          "type": "number"
+                        },
+                        "radiusMeters": {
+                          "type": "integer"
+                        }
+                      },
+                      "nullable": true
+                    },
                     "version": {
                       "description": "Incremented on every change, lets clients drop stale updates",
                       "type": "integer"
@@ -3162,7 +3356,6 @@
                         "durationSec",
                         "score",
                         "status",
-                        "suggestedById",
                         "createdAt"
                       ],
                       "properties": {
@@ -3219,9 +3412,6 @@
                             }
                           ]
                         },
-                        "suggestedById": {
-                          "type": "string"
-                        },
                         "createdAt": {
                           "type": "string",
                           "format": "date-time"
@@ -3245,7 +3435,6 @@
                           "durationSec",
                           "score",
                           "status",
-                          "suggestedById",
                           "createdAt"
                         ],
                         "properties": {
@@ -3301,9 +3490,6 @@
                                 ]
                               }
                             ]
-                          },
-                          "suggestedById": {
-                            "type": "string"
                           },
                           "createdAt": {
                             "type": "string",
@@ -3400,9 +3586,9 @@
                     "owner",
                     "visibility",
                     "license",
-                    "location",
                     "voteWindow",
                     "createdAt",
+                    "location",
                     "version",
                     "nowPlaying",
                     "queue",
@@ -3429,8 +3615,7 @@
                       "required": [
                         "id",
                         "displayName",
-                        "avatarUrl",
-                        "musicPreferences"
+                        "avatarUrl"
                       ],
                       "properties": {
                         "id": {
@@ -3442,12 +3627,6 @@
                         "avatarUrl": {
                           "type": "string",
                           "nullable": true
-                        },
-                        "musicPreferences": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
                         }
                       }
                     },
@@ -3489,26 +3668,6 @@
                         }
                       ]
                     },
-                    "location": {
-                      "type": "object",
-                      "required": [
-                        "latitude",
-                        "longitude",
-                        "radiusMeters"
-                      ],
-                      "properties": {
-                        "latitude": {
-                          "type": "number"
-                        },
-                        "longitude": {
-                          "type": "number"
-                        },
-                        "radiusMeters": {
-                          "type": "integer"
-                        }
-                      },
-                      "nullable": true
-                    },
                     "voteWindow": {
                       "type": "object",
                       "required": [
@@ -3531,6 +3690,26 @@
                       "type": "string",
                       "format": "date-time"
                     },
+                    "location": {
+                      "type": "object",
+                      "required": [
+                        "radiusMeters"
+                      ],
+                      "properties": {
+                        "latitude": {
+                          "description": "Owner only",
+                          "type": "number"
+                        },
+                        "longitude": {
+                          "description": "Owner only",
+                          "type": "number"
+                        },
+                        "radiusMeters": {
+                          "type": "integer"
+                        }
+                      },
+                      "nullable": true
+                    },
                     "version": {
                       "description": "Incremented on every change, lets clients drop stale updates",
                       "type": "integer"
@@ -3548,7 +3727,6 @@
                         "durationSec",
                         "score",
                         "status",
-                        "suggestedById",
                         "createdAt"
                       ],
                       "properties": {
@@ -3605,9 +3783,6 @@
                             }
                           ]
                         },
-                        "suggestedById": {
-                          "type": "string"
-                        },
                         "createdAt": {
                           "type": "string",
                           "format": "date-time"
@@ -3631,7 +3806,6 @@
                           "durationSec",
                           "score",
                           "status",
-                          "suggestedById",
                           "createdAt"
                         ],
                         "properties": {
@@ -3687,9 +3861,6 @@
                                 ]
                               }
                             ]
-                          },
-                          "suggestedById": {
-                            "type": "string"
                           },
                           "createdAt": {
                             "type": "string",
@@ -3887,9 +4058,9 @@
                     "owner",
                     "visibility",
                     "license",
-                    "location",
                     "voteWindow",
                     "createdAt",
+                    "location",
                     "version",
                     "nowPlaying",
                     "queue",
@@ -3916,8 +4087,7 @@
                       "required": [
                         "id",
                         "displayName",
-                        "avatarUrl",
-                        "musicPreferences"
+                        "avatarUrl"
                       ],
                       "properties": {
                         "id": {
@@ -3929,12 +4099,6 @@
                         "avatarUrl": {
                           "type": "string",
                           "nullable": true
-                        },
-                        "musicPreferences": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
                         }
                       }
                     },
@@ -3976,26 +4140,6 @@
                         }
                       ]
                     },
-                    "location": {
-                      "type": "object",
-                      "required": [
-                        "latitude",
-                        "longitude",
-                        "radiusMeters"
-                      ],
-                      "properties": {
-                        "latitude": {
-                          "type": "number"
-                        },
-                        "longitude": {
-                          "type": "number"
-                        },
-                        "radiusMeters": {
-                          "type": "integer"
-                        }
-                      },
-                      "nullable": true
-                    },
                     "voteWindow": {
                       "type": "object",
                       "required": [
@@ -4018,6 +4162,26 @@
                       "type": "string",
                       "format": "date-time"
                     },
+                    "location": {
+                      "type": "object",
+                      "required": [
+                        "radiusMeters"
+                      ],
+                      "properties": {
+                        "latitude": {
+                          "description": "Owner only",
+                          "type": "number"
+                        },
+                        "longitude": {
+                          "description": "Owner only",
+                          "type": "number"
+                        },
+                        "radiusMeters": {
+                          "type": "integer"
+                        }
+                      },
+                      "nullable": true
+                    },
                     "version": {
                       "description": "Incremented on every change, lets clients drop stale updates",
                       "type": "integer"
@@ -4035,7 +4199,6 @@
                         "durationSec",
                         "score",
                         "status",
-                        "suggestedById",
                         "createdAt"
                       ],
                       "properties": {
@@ -4092,9 +4255,6 @@
                             }
                           ]
                         },
-                        "suggestedById": {
-                          "type": "string"
-                        },
                         "createdAt": {
                           "type": "string",
                           "format": "date-time"
@@ -4118,7 +4278,6 @@
                           "durationSec",
                           "score",
                           "status",
-                          "suggestedById",
                           "createdAt"
                         ],
                         "properties": {
@@ -4174,9 +4333,6 @@
                                 ]
                               }
                             ]
-                          },
-                          "suggestedById": {
-                            "type": "string"
                           },
                           "createdAt": {
                             "type": "string",
@@ -4361,7 +4517,7 @@
     },
     "/events/{id}/invites": {
       "get": {
-        "summary": "Invited users",
+        "summary": "Invited users (owner)",
         "tags": [
           "events"
         ],
@@ -4389,8 +4545,7 @@
                     "required": [
                       "id",
                       "displayName",
-                      "avatarUrl",
-                      "musicPreferences"
+                      "avatarUrl"
                     ],
                     "properties": {
                       "id": {
@@ -4402,13 +4557,31 @@
                       "avatarUrl": {
                         "type": "string",
                         "nullable": true
-                      },
-                      "musicPreferences": {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
                       }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Error",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "description": "Machine readable code",
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
                     }
                   }
                 }
@@ -4492,9 +4665,9 @@
                     "owner",
                     "visibility",
                     "license",
-                    "location",
                     "voteWindow",
                     "createdAt",
+                    "location",
                     "version",
                     "nowPlaying",
                     "queue",
@@ -4521,8 +4694,7 @@
                       "required": [
                         "id",
                         "displayName",
-                        "avatarUrl",
-                        "musicPreferences"
+                        "avatarUrl"
                       ],
                       "properties": {
                         "id": {
@@ -4534,12 +4706,6 @@
                         "avatarUrl": {
                           "type": "string",
                           "nullable": true
-                        },
-                        "musicPreferences": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
                         }
                       }
                     },
@@ -4581,26 +4747,6 @@
                         }
                       ]
                     },
-                    "location": {
-                      "type": "object",
-                      "required": [
-                        "latitude",
-                        "longitude",
-                        "radiusMeters"
-                      ],
-                      "properties": {
-                        "latitude": {
-                          "type": "number"
-                        },
-                        "longitude": {
-                          "type": "number"
-                        },
-                        "radiusMeters": {
-                          "type": "integer"
-                        }
-                      },
-                      "nullable": true
-                    },
                     "voteWindow": {
                       "type": "object",
                       "required": [
@@ -4623,6 +4769,26 @@
                       "type": "string",
                       "format": "date-time"
                     },
+                    "location": {
+                      "type": "object",
+                      "required": [
+                        "radiusMeters"
+                      ],
+                      "properties": {
+                        "latitude": {
+                          "description": "Owner only",
+                          "type": "number"
+                        },
+                        "longitude": {
+                          "description": "Owner only",
+                          "type": "number"
+                        },
+                        "radiusMeters": {
+                          "type": "integer"
+                        }
+                      },
+                      "nullable": true
+                    },
                     "version": {
                       "description": "Incremented on every change, lets clients drop stale updates",
                       "type": "integer"
@@ -4640,7 +4806,6 @@
                         "durationSec",
                         "score",
                         "status",
-                        "suggestedById",
                         "createdAt"
                       ],
                       "properties": {
@@ -4697,9 +4862,6 @@
                             }
                           ]
                         },
-                        "suggestedById": {
-                          "type": "string"
-                        },
                         "createdAt": {
                           "type": "string",
                           "format": "date-time"
@@ -4723,7 +4885,6 @@
                           "durationSec",
                           "score",
                           "status",
-                          "suggestedById",
                           "createdAt"
                         ],
                         "properties": {
@@ -4779,9 +4940,6 @@
                                 ]
                               }
                             ]
-                          },
-                          "suggestedById": {
-                            "type": "string"
                           },
                           "createdAt": {
                             "type": "string",
@@ -4911,9 +5069,9 @@
                     "owner",
                     "visibility",
                     "license",
-                    "location",
                     "voteWindow",
                     "createdAt",
+                    "location",
                     "version",
                     "nowPlaying",
                     "queue",
@@ -4940,8 +5098,7 @@
                       "required": [
                         "id",
                         "displayName",
-                        "avatarUrl",
-                        "musicPreferences"
+                        "avatarUrl"
                       ],
                       "properties": {
                         "id": {
@@ -4953,12 +5110,6 @@
                         "avatarUrl": {
                           "type": "string",
                           "nullable": true
-                        },
-                        "musicPreferences": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
                         }
                       }
                     },
@@ -5000,26 +5151,6 @@
                         }
                       ]
                     },
-                    "location": {
-                      "type": "object",
-                      "required": [
-                        "latitude",
-                        "longitude",
-                        "radiusMeters"
-                      ],
-                      "properties": {
-                        "latitude": {
-                          "type": "number"
-                        },
-                        "longitude": {
-                          "type": "number"
-                        },
-                        "radiusMeters": {
-                          "type": "integer"
-                        }
-                      },
-                      "nullable": true
-                    },
                     "voteWindow": {
                       "type": "object",
                       "required": [
@@ -5042,6 +5173,26 @@
                       "type": "string",
                       "format": "date-time"
                     },
+                    "location": {
+                      "type": "object",
+                      "required": [
+                        "radiusMeters"
+                      ],
+                      "properties": {
+                        "latitude": {
+                          "description": "Owner only",
+                          "type": "number"
+                        },
+                        "longitude": {
+                          "description": "Owner only",
+                          "type": "number"
+                        },
+                        "radiusMeters": {
+                          "type": "integer"
+                        }
+                      },
+                      "nullable": true
+                    },
                     "version": {
                       "description": "Incremented on every change, lets clients drop stale updates",
                       "type": "integer"
@@ -5059,7 +5210,6 @@
                         "durationSec",
                         "score",
                         "status",
-                        "suggestedById",
                         "createdAt"
                       ],
                       "properties": {
@@ -5116,9 +5266,6 @@
                             }
                           ]
                         },
-                        "suggestedById": {
-                          "type": "string"
-                        },
                         "createdAt": {
                           "type": "string",
                           "format": "date-time"
@@ -5142,7 +5289,6 @@
                           "durationSec",
                           "score",
                           "status",
-                          "suggestedById",
                           "createdAt"
                         ],
                         "properties": {
@@ -5198,9 +5344,6 @@
                                 ]
                               }
                             ]
-                          },
-                          "suggestedById": {
-                            "type": "string"
                           },
                           "createdAt": {
                             "type": "string",
@@ -5351,9 +5494,9 @@
                     "owner",
                     "visibility",
                     "license",
-                    "location",
                     "voteWindow",
                     "createdAt",
+                    "location",
                     "version",
                     "nowPlaying",
                     "queue",
@@ -5380,8 +5523,7 @@
                       "required": [
                         "id",
                         "displayName",
-                        "avatarUrl",
-                        "musicPreferences"
+                        "avatarUrl"
                       ],
                       "properties": {
                         "id": {
@@ -5393,12 +5535,6 @@
                         "avatarUrl": {
                           "type": "string",
                           "nullable": true
-                        },
-                        "musicPreferences": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
                         }
                       }
                     },
@@ -5440,26 +5576,6 @@
                         }
                       ]
                     },
-                    "location": {
-                      "type": "object",
-                      "required": [
-                        "latitude",
-                        "longitude",
-                        "radiusMeters"
-                      ],
-                      "properties": {
-                        "latitude": {
-                          "type": "number"
-                        },
-                        "longitude": {
-                          "type": "number"
-                        },
-                        "radiusMeters": {
-                          "type": "integer"
-                        }
-                      },
-                      "nullable": true
-                    },
                     "voteWindow": {
                       "type": "object",
                       "required": [
@@ -5482,6 +5598,26 @@
                       "type": "string",
                       "format": "date-time"
                     },
+                    "location": {
+                      "type": "object",
+                      "required": [
+                        "radiusMeters"
+                      ],
+                      "properties": {
+                        "latitude": {
+                          "description": "Owner only",
+                          "type": "number"
+                        },
+                        "longitude": {
+                          "description": "Owner only",
+                          "type": "number"
+                        },
+                        "radiusMeters": {
+                          "type": "integer"
+                        }
+                      },
+                      "nullable": true
+                    },
                     "version": {
                       "description": "Incremented on every change, lets clients drop stale updates",
                       "type": "integer"
@@ -5499,7 +5635,6 @@
                         "durationSec",
                         "score",
                         "status",
-                        "suggestedById",
                         "createdAt"
                       ],
                       "properties": {
@@ -5556,9 +5691,6 @@
                             }
                           ]
                         },
-                        "suggestedById": {
-                          "type": "string"
-                        },
                         "createdAt": {
                           "type": "string",
                           "format": "date-time"
@@ -5582,7 +5714,6 @@
                           "durationSec",
                           "score",
                           "status",
-                          "suggestedById",
                           "createdAt"
                         ],
                         "properties": {
@@ -5638,9 +5769,6 @@
                                 ]
                               }
                             ]
-                          },
-                          "suggestedById": {
-                            "type": "string"
                           },
                           "createdAt": {
                             "type": "string",
@@ -5817,9 +5945,9 @@
                     "owner",
                     "visibility",
                     "license",
-                    "location",
                     "voteWindow",
                     "createdAt",
+                    "location",
                     "version",
                     "nowPlaying",
                     "queue",
@@ -5846,8 +5974,7 @@
                       "required": [
                         "id",
                         "displayName",
-                        "avatarUrl",
-                        "musicPreferences"
+                        "avatarUrl"
                       ],
                       "properties": {
                         "id": {
@@ -5859,12 +5986,6 @@
                         "avatarUrl": {
                           "type": "string",
                           "nullable": true
-                        },
-                        "musicPreferences": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
                         }
                       }
                     },
@@ -5906,26 +6027,6 @@
                         }
                       ]
                     },
-                    "location": {
-                      "type": "object",
-                      "required": [
-                        "latitude",
-                        "longitude",
-                        "radiusMeters"
-                      ],
-                      "properties": {
-                        "latitude": {
-                          "type": "number"
-                        },
-                        "longitude": {
-                          "type": "number"
-                        },
-                        "radiusMeters": {
-                          "type": "integer"
-                        }
-                      },
-                      "nullable": true
-                    },
                     "voteWindow": {
                       "type": "object",
                       "required": [
@@ -5948,6 +6049,26 @@
                       "type": "string",
                       "format": "date-time"
                     },
+                    "location": {
+                      "type": "object",
+                      "required": [
+                        "radiusMeters"
+                      ],
+                      "properties": {
+                        "latitude": {
+                          "description": "Owner only",
+                          "type": "number"
+                        },
+                        "longitude": {
+                          "description": "Owner only",
+                          "type": "number"
+                        },
+                        "radiusMeters": {
+                          "type": "integer"
+                        }
+                      },
+                      "nullable": true
+                    },
                     "version": {
                       "description": "Incremented on every change, lets clients drop stale updates",
                       "type": "integer"
@@ -5965,7 +6086,6 @@
                         "durationSec",
                         "score",
                         "status",
-                        "suggestedById",
                         "createdAt"
                       ],
                       "properties": {
@@ -6022,9 +6142,6 @@
                             }
                           ]
                         },
-                        "suggestedById": {
-                          "type": "string"
-                        },
                         "createdAt": {
                           "type": "string",
                           "format": "date-time"
@@ -6048,7 +6165,6 @@
                           "durationSec",
                           "score",
                           "status",
-                          "suggestedById",
                           "createdAt"
                         ],
                         "properties": {
@@ -6104,9 +6220,6 @@
                                 ]
                               }
                             ]
-                          },
-                          "suggestedById": {
-                            "type": "string"
                           },
                           "createdAt": {
                             "type": "string",
@@ -6259,9 +6372,9 @@
                     "owner",
                     "visibility",
                     "license",
-                    "location",
                     "voteWindow",
                     "createdAt",
+                    "location",
                     "version",
                     "nowPlaying",
                     "queue",
@@ -6288,8 +6401,7 @@
                       "required": [
                         "id",
                         "displayName",
-                        "avatarUrl",
-                        "musicPreferences"
+                        "avatarUrl"
                       ],
                       "properties": {
                         "id": {
@@ -6301,12 +6413,6 @@
                         "avatarUrl": {
                           "type": "string",
                           "nullable": true
-                        },
-                        "musicPreferences": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
                         }
                       }
                     },
@@ -6348,26 +6454,6 @@
                         }
                       ]
                     },
-                    "location": {
-                      "type": "object",
-                      "required": [
-                        "latitude",
-                        "longitude",
-                        "radiusMeters"
-                      ],
-                      "properties": {
-                        "latitude": {
-                          "type": "number"
-                        },
-                        "longitude": {
-                          "type": "number"
-                        },
-                        "radiusMeters": {
-                          "type": "integer"
-                        }
-                      },
-                      "nullable": true
-                    },
                     "voteWindow": {
                       "type": "object",
                       "required": [
@@ -6390,6 +6476,26 @@
                       "type": "string",
                       "format": "date-time"
                     },
+                    "location": {
+                      "type": "object",
+                      "required": [
+                        "radiusMeters"
+                      ],
+                      "properties": {
+                        "latitude": {
+                          "description": "Owner only",
+                          "type": "number"
+                        },
+                        "longitude": {
+                          "description": "Owner only",
+                          "type": "number"
+                        },
+                        "radiusMeters": {
+                          "type": "integer"
+                        }
+                      },
+                      "nullable": true
+                    },
                     "version": {
                       "description": "Incremented on every change, lets clients drop stale updates",
                       "type": "integer"
@@ -6407,7 +6513,6 @@
                         "durationSec",
                         "score",
                         "status",
-                        "suggestedById",
                         "createdAt"
                       ],
                       "properties": {
@@ -6464,9 +6569,6 @@
                             }
                           ]
                         },
-                        "suggestedById": {
-                          "type": "string"
-                        },
                         "createdAt": {
                           "type": "string",
                           "format": "date-time"
@@ -6490,7 +6592,6 @@
                           "durationSec",
                           "score",
                           "status",
-                          "suggestedById",
                           "createdAt"
                         ],
                         "properties": {
@@ -6546,9 +6647,6 @@
                                 ]
                               }
                             ]
-                          },
-                          "suggestedById": {
-                            "type": "string"
                           },
                           "createdAt": {
                             "type": "string",
@@ -6669,9 +6767,9 @@
                     "owner",
                     "visibility",
                     "license",
-                    "location",
                     "voteWindow",
                     "createdAt",
+                    "location",
                     "version",
                     "nowPlaying",
                     "queue",
@@ -6698,8 +6796,7 @@
                       "required": [
                         "id",
                         "displayName",
-                        "avatarUrl",
-                        "musicPreferences"
+                        "avatarUrl"
                       ],
                       "properties": {
                         "id": {
@@ -6711,12 +6808,6 @@
                         "avatarUrl": {
                           "type": "string",
                           "nullable": true
-                        },
-                        "musicPreferences": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
                         }
                       }
                     },
@@ -6758,26 +6849,6 @@
                         }
                       ]
                     },
-                    "location": {
-                      "type": "object",
-                      "required": [
-                        "latitude",
-                        "longitude",
-                        "radiusMeters"
-                      ],
-                      "properties": {
-                        "latitude": {
-                          "type": "number"
-                        },
-                        "longitude": {
-                          "type": "number"
-                        },
-                        "radiusMeters": {
-                          "type": "integer"
-                        }
-                      },
-                      "nullable": true
-                    },
                     "voteWindow": {
                       "type": "object",
                       "required": [
@@ -6800,6 +6871,26 @@
                       "type": "string",
                       "format": "date-time"
                     },
+                    "location": {
+                      "type": "object",
+                      "required": [
+                        "radiusMeters"
+                      ],
+                      "properties": {
+                        "latitude": {
+                          "description": "Owner only",
+                          "type": "number"
+                        },
+                        "longitude": {
+                          "description": "Owner only",
+                          "type": "number"
+                        },
+                        "radiusMeters": {
+                          "type": "integer"
+                        }
+                      },
+                      "nullable": true
+                    },
                     "version": {
                       "description": "Incremented on every change, lets clients drop stale updates",
                       "type": "integer"
@@ -6817,7 +6908,6 @@
                         "durationSec",
                         "score",
                         "status",
-                        "suggestedById",
                         "createdAt"
                       ],
                       "properties": {
@@ -6874,9 +6964,6 @@
                             }
                           ]
                         },
-                        "suggestedById": {
-                          "type": "string"
-                        },
                         "createdAt": {
                           "type": "string",
                           "format": "date-time"
@@ -6900,7 +6987,6 @@
                           "durationSec",
                           "score",
                           "status",
-                          "suggestedById",
                           "createdAt"
                         ],
                         "properties": {
@@ -6956,9 +7042,6 @@
                                 ]
                               }
                             ]
-                          },
-                          "suggestedById": {
-                            "type": "string"
                           },
                           "createdAt": {
                             "type": "string",
@@ -7088,7 +7171,8 @@
             },
             "in": "query",
             "name": "q",
-            "required": false
+            "required": false,
+            "description": "Name search"
           }
         ],
         "responses": {
@@ -7129,8 +7213,7 @@
                         "required": [
                           "id",
                           "displayName",
-                          "avatarUrl",
-                          "musicPreferences"
+                          "avatarUrl"
                         ],
                         "properties": {
                           "id": {
@@ -7142,12 +7225,6 @@
                           "avatarUrl": {
                             "type": "string",
                             "nullable": true
-                          },
-                          "musicPreferences": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
                           }
                         }
                       },
@@ -7306,8 +7383,7 @@
                       "required": [
                         "id",
                         "displayName",
-                        "avatarUrl",
-                        "musicPreferences"
+                        "avatarUrl"
                       ],
                       "properties": {
                         "id": {
@@ -7319,12 +7395,6 @@
                         "avatarUrl": {
                           "type": "string",
                           "nullable": true
-                        },
-                        "musicPreferences": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
                         }
                       }
                     },
@@ -7380,8 +7450,7 @@
                           "album",
                           "coverUrl",
                           "previewUrl",
-                          "durationSec",
-                          "addedById"
+                          "durationSec"
                         ],
                         "properties": {
                           "id": {
@@ -7414,9 +7483,6 @@
                           },
                           "durationSec": {
                             "type": "integer"
-                          },
-                          "addedById": {
-                            "type": "string"
                           }
                         }
                       }
@@ -7517,8 +7583,7 @@
                       "required": [
                         "id",
                         "displayName",
-                        "avatarUrl",
-                        "musicPreferences"
+                        "avatarUrl"
                       ],
                       "properties": {
                         "id": {
@@ -7530,12 +7595,6 @@
                         "avatarUrl": {
                           "type": "string",
                           "nullable": true
-                        },
-                        "musicPreferences": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
                         }
                       }
                     },
@@ -7591,8 +7650,7 @@
                           "album",
                           "coverUrl",
                           "previewUrl",
-                          "durationSec",
-                          "addedById"
+                          "durationSec"
                         ],
                         "properties": {
                           "id": {
@@ -7625,9 +7683,6 @@
                           },
                           "durationSec": {
                             "type": "integer"
-                          },
-                          "addedById": {
-                            "type": "string"
                           }
                         }
                       }
@@ -7780,8 +7835,7 @@
                       "required": [
                         "id",
                         "displayName",
-                        "avatarUrl",
-                        "musicPreferences"
+                        "avatarUrl"
                       ],
                       "properties": {
                         "id": {
@@ -7793,12 +7847,6 @@
                         "avatarUrl": {
                           "type": "string",
                           "nullable": true
-                        },
-                        "musicPreferences": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
                         }
                       }
                     },
@@ -7854,8 +7902,7 @@
                           "album",
                           "coverUrl",
                           "previewUrl",
-                          "durationSec",
-                          "addedById"
+                          "durationSec"
                         ],
                         "properties": {
                           "id": {
@@ -7888,9 +7935,6 @@
                           },
                           "durationSec": {
                             "type": "integer"
-                          },
-                          "addedById": {
-                            "type": "string"
                           }
                         }
                       }
@@ -8033,7 +8077,7 @@
     },
     "/playlists/{id}/invites": {
       "get": {
-        "summary": "Invited users",
+        "summary": "Invited users (owner)",
         "tags": [
           "playlists"
         ],
@@ -8061,8 +8105,7 @@
                     "required": [
                       "id",
                       "displayName",
-                      "avatarUrl",
-                      "musicPreferences"
+                      "avatarUrl"
                     ],
                     "properties": {
                       "id": {
@@ -8074,13 +8117,31 @@
                       "avatarUrl": {
                         "type": "string",
                         "nullable": true
-                      },
-                      "musicPreferences": {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
                       }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Error",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "description": "Machine readable code",
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
                     }
                   }
                 }
@@ -8187,8 +8248,7 @@
                       "required": [
                         "id",
                         "displayName",
-                        "avatarUrl",
-                        "musicPreferences"
+                        "avatarUrl"
                       ],
                       "properties": {
                         "id": {
@@ -8200,12 +8260,6 @@
                         "avatarUrl": {
                           "type": "string",
                           "nullable": true
-                        },
-                        "musicPreferences": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
                         }
                       }
                     },
@@ -8261,8 +8315,7 @@
                           "album",
                           "coverUrl",
                           "previewUrl",
-                          "durationSec",
-                          "addedById"
+                          "durationSec"
                         ],
                         "properties": {
                           "id": {
@@ -8295,9 +8348,6 @@
                           },
                           "durationSec": {
                             "type": "integer"
-                          },
-                          "addedById": {
-                            "type": "string"
                           }
                         }
                       }
@@ -8432,8 +8482,7 @@
                       "required": [
                         "id",
                         "displayName",
-                        "avatarUrl",
-                        "musicPreferences"
+                        "avatarUrl"
                       ],
                       "properties": {
                         "id": {
@@ -8445,12 +8494,6 @@
                         "avatarUrl": {
                           "type": "string",
                           "nullable": true
-                        },
-                        "musicPreferences": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
                         }
                       }
                     },
@@ -8506,8 +8549,7 @@
                           "album",
                           "coverUrl",
                           "previewUrl",
-                          "durationSec",
-                          "addedById"
+                          "durationSec"
                         ],
                         "properties": {
                           "id": {
@@ -8540,9 +8582,6 @@
                           },
                           "durationSec": {
                             "type": "integer"
-                          },
-                          "addedById": {
-                            "type": "string"
                           }
                         }
                       }
@@ -8694,8 +8733,7 @@
                       "required": [
                         "id",
                         "displayName",
-                        "avatarUrl",
-                        "musicPreferences"
+                        "avatarUrl"
                       ],
                       "properties": {
                         "id": {
@@ -8707,12 +8745,6 @@
                         "avatarUrl": {
                           "type": "string",
                           "nullable": true
-                        },
-                        "musicPreferences": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
                         }
                       }
                     },
@@ -8768,8 +8800,7 @@
                           "album",
                           "coverUrl",
                           "previewUrl",
-                          "durationSec",
-                          "addedById"
+                          "durationSec"
                         ],
                         "properties": {
                           "id": {
@@ -8802,9 +8833,6 @@
                           },
                           "durationSec": {
                             "type": "integer"
-                          },
-                          "addedById": {
-                            "type": "string"
                           }
                         }
                       }
@@ -9008,8 +9036,7 @@
                       "required": [
                         "id",
                         "displayName",
-                        "avatarUrl",
-                        "musicPreferences"
+                        "avatarUrl"
                       ],
                       "properties": {
                         "id": {
@@ -9021,12 +9048,6 @@
                         "avatarUrl": {
                           "type": "string",
                           "nullable": true
-                        },
-                        "musicPreferences": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
                         }
                       }
                     },
@@ -9082,8 +9103,7 @@
                           "album",
                           "coverUrl",
                           "previewUrl",
-                          "durationSec",
-                          "addedById"
+                          "durationSec"
                         ],
                         "properties": {
                           "id": {
@@ -9116,9 +9136,6 @@
                           },
                           "durationSec": {
                             "type": "integer"
-                          },
-                          "addedById": {
-                            "type": "string"
                           }
                         }
                       }
@@ -9277,8 +9294,7 @@
                       "required": [
                         "id",
                         "displayName",
-                        "avatarUrl",
-                        "musicPreferences"
+                        "avatarUrl"
                       ],
                       "properties": {
                         "id": {
@@ -9290,12 +9306,6 @@
                         "avatarUrl": {
                           "type": "string",
                           "nullable": true
-                        },
-                        "musicPreferences": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
                         }
                       }
                     },
@@ -9351,8 +9361,7 @@
                           "album",
                           "coverUrl",
                           "previewUrl",
-                          "durationSec",
-                          "addedById"
+                          "durationSec"
                         ],
                         "properties": {
                           "id": {
@@ -9385,9 +9394,6 @@
                           },
                           "durationSec": {
                             "type": "integer"
-                          },
-                          "addedById": {
-                            "type": "string"
                           }
                         }
                       }
@@ -9483,12 +9489,8 @@
                           "id",
                           "name",
                           "owner",
-                          "platform",
-                          "model",
-                          "appVersion",
                           "playback",
-                          "version",
-                          "lastSeenAt"
+                          "version"
                         ],
                         "properties": {
                           "id": {
@@ -9502,8 +9504,7 @@
                             "required": [
                               "id",
                               "displayName",
-                              "avatarUrl",
-                              "musicPreferences"
+                              "avatarUrl"
                             ],
                             "properties": {
                               "id": {
@@ -9515,26 +9516,8 @@
                               "avatarUrl": {
                                 "type": "string",
                                 "nullable": true
-                              },
-                              "musicPreferences": {
-                                "type": "array",
-                                "items": {
-                                  "type": "string"
-                                }
                               }
                             }
-                          },
-                          "platform": {
-                            "type": "string",
-                            "nullable": true
-                          },
-                          "model": {
-                            "type": "string",
-                            "nullable": true
-                          },
-                          "appVersion": {
-                            "type": "string",
-                            "nullable": true
                           },
                           "playback": {
                             "type": "object",
@@ -9596,10 +9579,6 @@
                           },
                           "version": {
                             "type": "integer"
-                          },
-                          "lastSeenAt": {
-                            "type": "string",
-                            "format": "date-time"
                           }
                         }
                       }
@@ -9612,12 +9591,8 @@
                           "id",
                           "name",
                           "owner",
-                          "platform",
-                          "model",
-                          "appVersion",
                           "playback",
-                          "version",
-                          "lastSeenAt"
+                          "version"
                         ],
                         "properties": {
                           "id": {
@@ -9631,8 +9606,7 @@
                             "required": [
                               "id",
                               "displayName",
-                              "avatarUrl",
-                              "musicPreferences"
+                              "avatarUrl"
                             ],
                             "properties": {
                               "id": {
@@ -9644,26 +9618,8 @@
                               "avatarUrl": {
                                 "type": "string",
                                 "nullable": true
-                              },
-                              "musicPreferences": {
-                                "type": "array",
-                                "items": {
-                                  "type": "string"
-                                }
                               }
                             }
-                          },
-                          "platform": {
-                            "type": "string",
-                            "nullable": true
-                          },
-                          "model": {
-                            "type": "string",
-                            "nullable": true
-                          },
-                          "appVersion": {
-                            "type": "string",
-                            "nullable": true
                           },
                           "playback": {
                             "type": "object",
@@ -9725,10 +9681,6 @@
                           },
                           "version": {
                             "type": "integer"
-                          },
-                          "lastSeenAt": {
-                            "type": "string",
-                            "format": "date-time"
                           }
                         }
                       }
@@ -9783,12 +9735,8 @@
                     "id",
                     "name",
                     "owner",
-                    "platform",
-                    "model",
-                    "appVersion",
                     "playback",
                     "version",
-                    "lastSeenAt",
                     "isOwner",
                     "delegations"
                   ],
@@ -9804,8 +9752,7 @@
                       "required": [
                         "id",
                         "displayName",
-                        "avatarUrl",
-                        "musicPreferences"
+                        "avatarUrl"
                       ],
                       "properties": {
                         "id": {
@@ -9817,26 +9764,8 @@
                         "avatarUrl": {
                           "type": "string",
                           "nullable": true
-                        },
-                        "musicPreferences": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
                         }
                       }
-                    },
-                    "platform": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "model": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "appVersion": {
-                      "type": "string",
-                      "nullable": true
                     },
                     "playback": {
                       "type": "object",
@@ -9899,10 +9828,6 @@
                     "version": {
                       "type": "integer"
                     },
-                    "lastSeenAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
                     "isOwner": {
                       "type": "boolean"
                     },
@@ -9922,8 +9847,7 @@
                             "required": [
                               "id",
                               "displayName",
-                              "avatarUrl",
-                              "musicPreferences"
+                              "avatarUrl"
                             ],
                             "properties": {
                               "id": {
@@ -9935,12 +9859,6 @@
                               "avatarUrl": {
                                 "type": "string",
                                 "nullable": true
-                              },
-                              "musicPreferences": {
-                                "type": "array",
-                                "items": {
-                                  "type": "string"
-                                }
                               }
                             }
                           },
@@ -9993,12 +9911,8 @@
                     "id",
                     "name",
                     "owner",
-                    "platform",
-                    "model",
-                    "appVersion",
                     "playback",
                     "version",
-                    "lastSeenAt",
                     "isOwner",
                     "delegations"
                   ],
@@ -10014,8 +9928,7 @@
                       "required": [
                         "id",
                         "displayName",
-                        "avatarUrl",
-                        "musicPreferences"
+                        "avatarUrl"
                       ],
                       "properties": {
                         "id": {
@@ -10027,26 +9940,8 @@
                         "avatarUrl": {
                           "type": "string",
                           "nullable": true
-                        },
-                        "musicPreferences": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
                         }
                       }
-                    },
-                    "platform": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "model": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "appVersion": {
-                      "type": "string",
-                      "nullable": true
                     },
                     "playback": {
                       "type": "object",
@@ -10109,10 +10004,6 @@
                     "version": {
                       "type": "integer"
                     },
-                    "lastSeenAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
                     "isOwner": {
                       "type": "boolean"
                     },
@@ -10132,8 +10023,7 @@
                             "required": [
                               "id",
                               "displayName",
-                              "avatarUrl",
-                              "musicPreferences"
+                              "avatarUrl"
                             ],
                             "properties": {
                               "id": {
@@ -10145,12 +10035,6 @@
                               "avatarUrl": {
                                 "type": "string",
                                 "nullable": true
-                              },
-                              "musicPreferences": {
-                                "type": "array",
-                                "items": {
-                                  "type": "string"
-                                }
                               }
                             }
                           },
@@ -10245,12 +10129,8 @@
                     "id",
                     "name",
                     "owner",
-                    "platform",
-                    "model",
-                    "appVersion",
                     "playback",
                     "version",
-                    "lastSeenAt",
                     "isOwner",
                     "delegations"
                   ],
@@ -10266,8 +10146,7 @@
                       "required": [
                         "id",
                         "displayName",
-                        "avatarUrl",
-                        "musicPreferences"
+                        "avatarUrl"
                       ],
                       "properties": {
                         "id": {
@@ -10279,26 +10158,8 @@
                         "avatarUrl": {
                           "type": "string",
                           "nullable": true
-                        },
-                        "musicPreferences": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
                         }
                       }
-                    },
-                    "platform": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "model": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "appVersion": {
-                      "type": "string",
-                      "nullable": true
                     },
                     "playback": {
                       "type": "object",
@@ -10361,10 +10222,6 @@
                     "version": {
                       "type": "integer"
                     },
-                    "lastSeenAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
                     "isOwner": {
                       "type": "boolean"
                     },
@@ -10384,8 +10241,7 @@
                             "required": [
                               "id",
                               "displayName",
-                              "avatarUrl",
-                              "musicPreferences"
+                              "avatarUrl"
                             ],
                             "properties": {
                               "id": {
@@ -10397,12 +10253,6 @@
                               "avatarUrl": {
                                 "type": "string",
                                 "nullable": true
-                              },
-                              "musicPreferences": {
-                                "type": "array",
-                                "items": {
-                                  "type": "string"
-                                }
                               }
                             }
                           },
@@ -10602,12 +10452,8 @@
                     "id",
                     "name",
                     "owner",
-                    "platform",
-                    "model",
-                    "appVersion",
                     "playback",
                     "version",
-                    "lastSeenAt",
                     "isOwner",
                     "delegations"
                   ],
@@ -10623,8 +10469,7 @@
                       "required": [
                         "id",
                         "displayName",
-                        "avatarUrl",
-                        "musicPreferences"
+                        "avatarUrl"
                       ],
                       "properties": {
                         "id": {
@@ -10636,26 +10481,8 @@
                         "avatarUrl": {
                           "type": "string",
                           "nullable": true
-                        },
-                        "musicPreferences": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
                         }
                       }
-                    },
-                    "platform": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "model": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "appVersion": {
-                      "type": "string",
-                      "nullable": true
                     },
                     "playback": {
                       "type": "object",
@@ -10718,10 +10545,6 @@
                     "version": {
                       "type": "integer"
                     },
-                    "lastSeenAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
                     "isOwner": {
                       "type": "boolean"
                     },
@@ -10741,8 +10564,7 @@
                             "required": [
                               "id",
                               "displayName",
-                              "avatarUrl",
-                              "musicPreferences"
+                              "avatarUrl"
                             ],
                             "properties": {
                               "id": {
@@ -10754,12 +10576,6 @@
                               "avatarUrl": {
                                 "type": "string",
                                 "nullable": true
-                              },
-                              "musicPreferences": {
-                                "type": "array",
-                                "items": {
-                                  "type": "string"
-                                }
                               }
                             }
                           },
@@ -10892,12 +10708,8 @@
                     "id",
                     "name",
                     "owner",
-                    "platform",
-                    "model",
-                    "appVersion",
                     "playback",
                     "version",
-                    "lastSeenAt",
                     "isOwner",
                     "delegations"
                   ],
@@ -10913,8 +10725,7 @@
                       "required": [
                         "id",
                         "displayName",
-                        "avatarUrl",
-                        "musicPreferences"
+                        "avatarUrl"
                       ],
                       "properties": {
                         "id": {
@@ -10926,26 +10737,8 @@
                         "avatarUrl": {
                           "type": "string",
                           "nullable": true
-                        },
-                        "musicPreferences": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
                         }
                       }
-                    },
-                    "platform": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "model": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "appVersion": {
-                      "type": "string",
-                      "nullable": true
                     },
                     "playback": {
                       "type": "object",
@@ -11008,10 +10801,6 @@
                     "version": {
                       "type": "integer"
                     },
-                    "lastSeenAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
                     "isOwner": {
                       "type": "boolean"
                     },
@@ -11031,8 +10820,7 @@
                             "required": [
                               "id",
                               "displayName",
-                              "avatarUrl",
-                              "musicPreferences"
+                              "avatarUrl"
                             ],
                             "properties": {
                               "id": {
@@ -11044,12 +10832,6 @@
                               "avatarUrl": {
                                 "type": "string",
                                 "nullable": true
-                              },
-                              "musicPreferences": {
-                                "type": "array",
-                                "items": {
-                                  "type": "string"
-                                }
                               }
                             }
                           },
@@ -11232,12 +11014,8 @@
                     "id",
                     "name",
                     "owner",
-                    "platform",
-                    "model",
-                    "appVersion",
                     "playback",
                     "version",
-                    "lastSeenAt",
                     "isOwner",
                     "delegations"
                   ],
@@ -11253,8 +11031,7 @@
                       "required": [
                         "id",
                         "displayName",
-                        "avatarUrl",
-                        "musicPreferences"
+                        "avatarUrl"
                       ],
                       "properties": {
                         "id": {
@@ -11266,26 +11043,8 @@
                         "avatarUrl": {
                           "type": "string",
                           "nullable": true
-                        },
-                        "musicPreferences": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
                         }
                       }
-                    },
-                    "platform": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "model": {
-                      "type": "string",
-                      "nullable": true
-                    },
-                    "appVersion": {
-                      "type": "string",
-                      "nullable": true
                     },
                     "playback": {
                       "type": "object",
@@ -11348,10 +11107,6 @@
                     "version": {
                       "type": "integer"
                     },
-                    "lastSeenAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    },
                     "isOwner": {
                       "type": "boolean"
                     },
@@ -11371,8 +11126,7 @@
                             "required": [
                               "id",
                               "displayName",
-                              "avatarUrl",
-                              "musicPreferences"
+                              "avatarUrl"
                             ],
                             "properties": {
                               "id": {
@@ -11384,12 +11138,6 @@
                               "avatarUrl": {
                                 "type": "string",
                                 "nullable": true
-                              },
-                              "musicPreferences": {
-                                "type": "array",
-                                "items": {
-                                  "type": "string"
-                                }
                               }
                             }
                           },

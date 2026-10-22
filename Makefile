@@ -1,5 +1,4 @@
-# Music Room - every dependency is downloaded from the registries, nothing is vendored.
-# On Windows without make, the same commands exist as npm scripts in package.json.
+# Every dependency comes from the registries; on Windows, package.json has the same commands.
 
 all: install
 
@@ -13,7 +12,11 @@ db:
 
 # Alternative: PostgreSQL in Docker
 db-docker:
-	docker compose up -d db
+	cd backend && npm run db:docker
+
+# Local inbox: catches every email the API sends (SMTP localhost:1025), read at http://localhost:1080
+mail:
+	cd backend && npm run mail:local
 
 migrate:
 	cd backend && npx prisma migrate deploy
@@ -44,12 +47,22 @@ docs:
 load:
 	cd backend && npm run load
 
+# Needs `make dev` and `make mobile` running (see README): e2e opens the Playwright UI, e2e-cli the terminal
+e2e: e2e-deps
+	cd e2e && npm run checks:ui
+
+e2e-cli: e2e-deps
+	cd e2e && npm run checks
+
+e2e-deps:
+	cd e2e && npm ci && npx playwright install chromium
+
 clean:
 	rm -rf backend/dist backend/coverage mobile/dist mobile/.expo
 
 fclean: clean
-	rm -rf backend/node_modules mobile/node_modules
+	rm -rf backend/node_modules mobile/node_modules e2e/node_modules
 
 re: fclean all
 
-.PHONY: all install db db-docker migrate dev mobile android test lint build docs load clean fclean re
+.PHONY: all install db db-docker mail migrate dev mobile android test lint build docs load e2e e2e-cli e2e-deps clean fclean re
