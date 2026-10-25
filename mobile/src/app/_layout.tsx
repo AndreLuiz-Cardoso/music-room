@@ -52,7 +52,12 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <AuthProvider>
         <StatusBar style="light" />
-        <RootStack />
+        {/* always the phone's format: on a wide screen (web, tablet) the app is a centered column */}
+        <View style={{ flex: 1, backgroundColor: colors.bg }}>
+          <View style={{ flex: 1, width: '100%', maxWidth: 400, alignSelf: 'center' }}>
+            <RootStack />
+          </View>
+        </View>
       </AuthProvider>
     </SafeAreaProvider>
   );
