@@ -55,6 +55,19 @@ http://localhost:8081/server), para testar contra outro servidor.
 No emulador Android, `localhost` do PC é `http://10.0.2.2:3000` (o valor do `.env.example`); o app web e o
 simulador iOS usam `localhost` com o mesmo `.env`. Num celular, use o IP da máquina na rede.
 
+### Sem espaço na home (`ENOSPC`)
+
+O cache do npm fica em `~/.npm` e enche rápido uma home pequena (as da 42): o `npm ci` falha com
+`ENOSPC: no space left on device`. Mova o cache para o goinfre e apague o antigo:
+
+```bash
+npm config set cache /goinfre/$USER/.npm-cache   # gravado em ~/.npmrc, vale para todos os projetos
+rm -rf ~/.npm/_cacache ~/.npm/_logs              # é só cache: o npm baixa de novo o que precisar
+```
+
+O goinfre é local a cada máquina e pode ser limpo: na pior das hipóteses o npm baixa os pacotes de novo.
+Para manter o cache entre máquinas, use `/sgoinfre/$USER/.npm-cache`. Depois, rode `make install` de novo.
+
 ### Login Google / Facebook
 
 As bibliotecas oficiais têm código nativo: elas funcionam num *development build*, não no Expo Go.
