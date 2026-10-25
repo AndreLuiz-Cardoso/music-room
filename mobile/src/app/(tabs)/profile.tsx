@@ -1,9 +1,10 @@
 import { useState } from 'react';
+import { GoogleButton } from '@/components/GoogleButton';
 import { Body, Button, ErrorText, Input, Row, Screen, Section, Title, space } from '@/components/ui';
 import { api, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { attempt, notify } from '@/lib/hooks';
-import { SocialCancelled, facebookAccessToken, googleIdToken, socialAvailability } from '@/lib/social';
+import { SocialCancelled, facebookAccessToken, socialAvailability } from '@/lib/social';
 import type { Me } from '@/lib/types';
 
 export default function ProfileScreen() {
@@ -43,16 +44,20 @@ function ProfileForm({ user }: { user: Me }) {
     }
   }
 
-  async function link(provider: 'google' | 'facebook') {
+  async function link(linkWith: () => Promise<Me>) {
     try {
-      const me: Me =
-        provider === 'google'
-          ? await api.me.linkGoogle(await googleIdToken())
-          : await api.me.linkFacebook(await facebookAccessToken());
-      setUser(me);
+      setUser(await linkWith());
     } catch (err) {
       if (!(err instanceof SocialCancelled)) notify('Error', errorMessage(err));
     }
+  }
+
+  function linkButton(provider: 'google' | 'facebook') {
+    if (!socialAvailability[provider]) return null;
+    if (provider === 'google') {
+      return <GoogleButton purpose="link" onPress={(idToken) => link(async () => api.me.linkGoogle(await idToken()))} />;
+    }
+    return <Button small variant="secondary" title="Link" onPress={() => link(async () => api.me.linkFacebook(await facebookAccessToken()))} />;
   }
 
   async function changePassword() {
@@ -93,9 +98,9 @@ function ProfileForm({ user }: { user: Me }) {
             </Body>
             {user.linkedProviders[p] ? (
               <Button small variant="secondary" title="Unlink" onPress={() => attempt(() => api.me.unlink(p)).then((me) => me && setUser(me))} />
-            ) : socialAvailability[p] ? (
-              <Button small variant="secondary" title="Link" onPress={() => link(p)} />
-            ) : null}
+            ) : (
+              linkButton(p)
+            )}
           </Row>
         ))}
       </Section>

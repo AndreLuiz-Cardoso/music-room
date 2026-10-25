@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 
 // Native sign-in SDKs (absent in Expo Go and on the web); the back-end verifies the credential.
+// On the web, Google sign-in goes through Google's own button instead (components/GoogleButton.web.tsx).
 
 const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 const facebookAppId = process.env.EXPO_PUBLIC_FACEBOOK_APP_ID;
@@ -22,9 +23,18 @@ const facebook = load(() => (facebookAppId ? require('react-native-fbsdk-next') 
 
 if (google) google.GoogleSignin.configure({ webClientId: googleWebClientId });
 
-export const socialAvailability = { google: !!google, facebook: !!facebook };
+export const socialAvailability = {
+  google: Platform.OS === 'web' ? !!googleWebClientId : !!google,
+  facebook: !!facebook,
+};
 
 export class SocialCancelled extends Error {}
+
+/** `onPress` receives the way to get the ID token, so that the screen handles its errors and cancellation. */
+export interface GoogleButtonProps {
+  purpose: 'login' | 'link';
+  onPress: (idToken: () => Promise<string>) => void;
+}
 
 /** Returns a Google ID token, issued for our web client id (the back-end checks the audience). */
 export async function googleIdToken(): Promise<string> {

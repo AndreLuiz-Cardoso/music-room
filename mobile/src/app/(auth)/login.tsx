@@ -1,11 +1,12 @@
 import { Link } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { Body, Button, ErrorText, Input, Screen, Title, space, styles } from '@/components/ui';
+import { GoogleButton } from '@/components/GoogleButton';
+import { Body, Button, ErrorText, Input, Screen, Title, colors, space, styles } from '@/components/ui';
 import { ApiError, api, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { notify } from '@/lib/hooks';
-import { SocialCancelled, facebookAccessToken, googleIdToken, socialAvailability } from '@/lib/social';
+import { SocialCancelled, facebookAccessToken, socialAvailability } from '@/lib/social';
 
 export default function LoginScreen() {
   const { startSession } = useAuth();
@@ -31,13 +32,15 @@ export default function LoginScreen() {
   }
 
   const login = () => run(async () => startSession(await api.auth.login(email.trim(), password)));
-  const google = () => run(async () => startSession(await api.auth.google(await googleIdToken())));
+  const google = (idToken: () => Promise<string>) => run(async () => startSession(await api.auth.google(await idToken())));
   const facebook = () => run(async () => startSession(await api.auth.facebook(await facebookAccessToken())));
   const resend = () =>
     run(async () => {
       await api.auth.resendVerification(email.trim());
       notify('Email sent', 'Open the link we sent you, then log in.');
     });
+
+  const social = socialAvailability.google || socialAvailability.facebook;
 
   return (
     <Screen>
@@ -46,21 +49,39 @@ export default function LoginScreen() {
         <Body muted>Vote, edit playlists and pass the aux, together.</Body>
       </View>
       <Title>Log in</Title>
+      {social ? (
+        <>
+          {socialAvailability.google ? <GoogleButton purpose="login" onPress={google} /> : null}
+          {socialAvailability.facebook ? <Button title="Continue with Facebook" variant="secondary" onPress={facebook} /> : null}
+          <Divider label="or continue with email" />
+        </>
+      ) : null}
       <Input label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoComplete="email" />
       <Input label="Password" value={password} onChangeText={setPassword} secureTextEntry autoComplete="password" />
+      <Link href="/forgot" style={[styles.link, { alignSelf: 'flex-end', fontSize: 13, marginBottom: space.sm }]}>
+        Forgot your password?
+      </Link>
       <ErrorText>{error}</ErrorText>
       {unverified ? <Button title="Send the confirmation email again" variant="secondary" onPress={resend} /> : null}
       <Button title="Log in" onPress={login} loading={busy} disabled={!email || !password} />
-      {socialAvailability.google ? <Button title="Continue with Google" variant="secondary" onPress={google} /> : null}
-      {socialAvailability.facebook ? <Button title="Continue with Facebook" variant="secondary" onPress={facebook} /> : null}
-      <View style={{ marginTop: space.lg, gap: space.md }}>
+      <Divider label="or" />
+      <Body muted style={{ textAlign: 'center' }}>
+        {"Don't have an account? "}
         <Link href="/register" style={styles.link}>
           Create an account
         </Link>
-        <Link href="/forgot" style={styles.link}>
-          Forgot your password?
-        </Link>
-      </View>
+      </Body>
     </Screen>
+  );
+}
+
+function Divider({ label }: { label: string }) {
+  const line = { flex: 1, height: 1, backgroundColor: colors.raised };
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, marginVertical: space.lg }}>
+      <View style={line} />
+      <Text style={[styles.body, styles.muted, { fontSize: 13 }]}>{label}</Text>
+      <View style={line} />
+    </View>
   );
 }
